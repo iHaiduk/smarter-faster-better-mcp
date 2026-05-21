@@ -16,6 +16,14 @@ describe('cleanJSON', () => {
     expect(cleanJSON('prelude {"a":1, "b":[1,2]} trailing junk')).toBe('{"a":1, "b":[1,2]}')
   })
 
+  test('handles array objects with first `[` / last `]` slice', () => {
+    expect(cleanJSON('prelude [{"a":1}] trailing junk')).toBe('[{"a":1}]')
+  })
+
+  test('strips thinking/reasoning blocks before JSON arrays', () => {
+    expect(cleanJSON('<think>\nShould use arrays.\n</think>\n  [{"symbol": "X"}]')).toBe('[{"symbol": "X"}]')
+  })
+
   test('returns trimmed raw string when no JSON markers present', () => {
     expect(cleanJSON('  hello  ')).toBe('hello')
   })

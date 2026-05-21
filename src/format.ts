@@ -87,7 +87,7 @@ export function serializeForLLM(symbols: readonly SymbolEntry[]): string {
 
   const lines: string[] = []
   for (const [file, syms] of byFile) {
-    lines.push(`# ${file}`)
+    lines.push(`File: ${file}`)
     for (const sym of syms) {
       const sig = sym.signature.slice(0, MAX_SIG_CHARS)
       const doc = sym.doc ? ` — ${sym.doc.slice(0, MAX_DOC_CHARS)}` : ''

@@ -72,9 +72,9 @@ describe('serializeForLLM', () => {
     { name: 'C', file: 'b.ts', line: 3, kind: 'TSTypeAliasDeclaration', signature: 'type C = string', doc: '' },
   ]
 
-  test('groups by file with `#` headers', () => {
+  test('groups by file with `File:` headers', () => {
     const out = serializeForLLM(symbols)
-    expect(out).toMatch(/# a\.ts[\s\S]+# b\.ts/)
+    expect(out).toMatch(/File: a\.ts[\s\S]+File: b\.ts/)
   })
 
   test('includes short kind labels and doc suffixes', () => {
