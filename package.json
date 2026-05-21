@@ -1,0 +1,31 @@
+{
+  "name": "smarter-faster-better-mcp",
+  "version": "0.1.0",
+  "description": "Blazing fast AST-based MCP code search using oxc-parser",
+  "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iHaiduk/smarter-faster-better-mcp.git"
+  },
+  "keywords": ["mcp", "bun", "typescript", "ast", "search", "ai"],
+  "author": "Igor Haiduk",
+  "license": "MIT",
+  "bin": {
+    "smarter-faster-better-mcp": "./src/index.ts"
+  },
+  "main": "src/index.ts",
+  "scripts": {
+    "check": "bun run --bun tsc --noEmit",
+    "scout": "bun run src/bin/test-scout.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "oxc-parser": "^0.132.0",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "typescript": "6.0.3"
+  }
+}

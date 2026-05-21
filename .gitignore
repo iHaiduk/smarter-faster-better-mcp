@@ -1,0 +1,5 @@
+.project_map.json
+.scout-cache/
+node_modules/
+dist/
+.env
