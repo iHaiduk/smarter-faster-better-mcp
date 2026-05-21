@@ -17,7 +17,9 @@ const IGNORE_PATTERNS = [
 ] as const
 
 const IGNORE_SUFFIXES = [
-  '.d.ts', '.test.ts', '.spec.ts', '.test.tsx', '.spec.tsx', 'package-lock.json'
+  '.d.ts', '.test.ts', '.spec.ts', '.test.tsx', '.spec.tsx',
+  '.test.js', '.spec.js', '.test.jsx', '.spec.jsx',
+  'package-lock.json'
 ] as const
 
 function shouldSkipFile(file: string): boolean {
@@ -27,9 +29,9 @@ function shouldSkipFile(file: string): boolean {
   )
 }
 
-/** Lists relative paths of TypeScript source files under cwd, skipping noise. */
+/** Lists relative paths of source files under cwd, skipping noise. */
 export async function getProjectFiles(): Promise<string[]> {
-  const glob = new Bun.Glob('**/*.{ts,tsx,json}')
+  const glob = new Bun.Glob('**/*.{ts,tsx,js,jsx,json}')
   const files: string[] = []
   for await (const file of glob.scan({ cwd: process.cwd(), onlyFiles: true })) {
     if (!shouldSkipFile(file)) files.push(file)
