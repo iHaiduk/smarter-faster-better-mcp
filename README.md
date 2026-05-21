@@ -13,7 +13,7 @@ A blazing fast, ultra-lightweight **Model Context Protocol (MCP)** server for **
 Traditional codebase analysis tools force LLMs to traverse directories, read raw files, and manually resolve references. This wastes thousands of tokens, causes context overflow, and is extremely slow. 
 
 **MCP Scout** takes a smarter approach:
-1. **Zero Native Bindings**: Replaced heavy and compilation-prone `tree-sitter` with Rust-powered `oxc-parser`. It installs in milliseconds on any system (including Node 26+) without needing `node-gyp` or C++ compiler flags.
+1. **Zero Native Bindings**: Powered by the Rust-based `oxc-parser`. It installs in milliseconds on any system (including Node 26+) without needing `node-gyp` or C++ compiler flags.
 2. **Deterministic String Filtering**: Employs rapid Jaro-Winkler edit distance and stop-word filtering to narrow down thousands of project symbols to the most relevant candidates instantly.
 3. **LLM Chunk Parallelism**: Chunks the compact symbol map and distributes requests in parallel to avoid context limits. This enables inexpensive, local, and low-latency LLMs (e.g., Ollama) to categorize symbols with high accuracy.
 4. **AST Extraction & Code Collapsing**: Extracts precise function and class bodies directly via AST parsing. Supports `summaryOnly` mode to collapse bodies into stubs, retaining context while saving up to 90% of tokens.
