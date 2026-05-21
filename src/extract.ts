@@ -11,7 +11,7 @@ import { isIdentifier } from './types.js'
 import type { AstNode, ExtractedSymbol, LLMCandidate, ProjectMap } from './types.js'
 
 const MAX_TYPE_DEFS = 3
-const FALLBACK_LINES = 100
+const FALLBACK_LINES = 20
 
 /** Pulls up to `MAX_TYPE_DEFS` interface/type-alias definitions referenced inside `code`. */
 export async function extractTypeDefinitions(

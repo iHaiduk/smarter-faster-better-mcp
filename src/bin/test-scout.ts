@@ -27,7 +27,7 @@ const paint = (color: keyof typeof COLOR, text: string | number): string =>
 async function run(): Promise<void> {
   const args = process.argv.slice(2)
   const summaryOnly = args.includes('--summary')
-  const query = args.filter((arg) => arg !== '--summary').join(' ') || 'cache'
+  const query = args.filter((arg) => arg !== '--summary').join(' ') || 'lang'
 
   console.log(`\n${paint('magenta', '=== MCP Scout CLI Test Runner ===')}`)
   console.log(`Searching for: "${paint('cyan', query)}" (summaryOnly: ${paint('yellow', String(summaryOnly))})`)

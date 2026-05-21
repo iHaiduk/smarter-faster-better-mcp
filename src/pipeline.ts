@@ -107,7 +107,13 @@ export async function runFindCodePipeline(
   const candidates = await askCheapLLM(task, compactMaps, gitHint, config)
   if (!candidates) return formatDegraded('LLM unavailable or timed out')
 
-  const good = candidates.filter((c) => c.confidence >= config.confidenceThreshold)
+  let good = candidates.filter((c) => c.confidence >= config.confidenceThreshold)
+  
+  // Validate against map to prevent hallucinated extraction fallbacks
+  good = good.filter((c) =>
+    map.symbols.some((s) => s.file === c.file && s.name === c.symbol)
+  )
+
   if (good.length === 0) return formatNotFound(task, map.symbolsCount)
 
   const cachedResults: ExtractedSymbol[] = []

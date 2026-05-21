@@ -27,7 +27,7 @@
   },
   "scripts": {
     "check": "bun run --bun tsc --noEmit",
-    "scout": "bun run src/bin/test-scout.ts",
+    "scout": "bun run src/bin/test-scout.ts lang --summary",
     "test": "bun test"
   },
   "dependencies": {
