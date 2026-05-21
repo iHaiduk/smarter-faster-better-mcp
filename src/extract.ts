@@ -93,24 +93,44 @@ export async function extractWithOxc(
   let imports: string[] = []
 
   try {
-    const parsed = parseSync(candidate.file, source)
-    imports = await extractFileImports(parsed.program, candidate.file)
-    const program = parsed.program as unknown as AstNode
-
-    walkAst(program, (node) => {
-      if (extractName(node) === candidate.symbol) {
-        targetNode = node
-        return true
+    if (candidate.file.endsWith('.json')) {
+      const parsedJson = JSON.parse(source)
+      const foundValue = parsedJson[candidate.symbol]
+      if (foundValue !== undefined) {
+        return {
+          candidate,
+          code: `"${candidate.symbol}": ${JSON.stringify(foundValue, null, 2)}`,
+          signature: mapEntry?.signature ?? '',
+          doc: '',
+          imports: [],
+          importedBy: [],
+          extractionOk: true,
+          startLine: 1,
+          endLine: 1,
+          typeDefs: [],
+          fullLength: JSON.stringify(foundValue).length
+        }
       }
-      if (node.type === 'VariableDeclarator') {
-        const id = node['id']
-        if (isIdentifier(id) && id.name === candidate.symbol) {
+    } else {
+      const parsed = parseSync(candidate.file, source)
+      imports = await extractFileImports(parsed.program, candidate.file)
+      const program = parsed.program as unknown as AstNode
+  
+      walkAst(program, (node) => {
+        if (extractName(node) === candidate.symbol) {
           targetNode = node
           return true
         }
-      }
-      return false
-    })
+        if (node.type === 'VariableDeclarator') {
+          const id = node['id']
+          if (isIdentifier(id) && id.name === candidate.symbol) {
+            targetNode = node
+            return true
+          }
+        }
+        return false
+      })
+    }
   } catch (err) {
     console.error(`[Scout] Failed to parse AST for extraction in ${candidate.file}:`, err)
   }

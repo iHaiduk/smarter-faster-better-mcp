@@ -7,6 +7,7 @@ export const SYMBOL_KINDS = [
   'TSInterfaceDeclaration',
   'TSTypeAliasDeclaration',
   'ArrowFunctionExpression',
+  'JSONProperty',
 ] as const
 
 export type SymbolKind = (typeof SYMBOL_KINDS)[number]

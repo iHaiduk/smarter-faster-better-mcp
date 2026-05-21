@@ -17,7 +17,7 @@ const IGNORE_PATTERNS = [
 ] as const
 
 const IGNORE_SUFFIXES = [
-  '.d.ts', '.test.ts', '.spec.ts', '.test.tsx', '.spec.tsx',
+  '.d.ts', '.test.ts', '.spec.ts', '.test.tsx', '.spec.tsx', 'package-lock.json'
 ] as const
 
 function shouldSkipFile(file: string): boolean {
@@ -29,7 +29,7 @@ function shouldSkipFile(file: string): boolean {
 
 /** Lists relative paths of TypeScript source files under cwd, skipping noise. */
 export async function getProjectFiles(): Promise<string[]> {
-  const glob = new Bun.Glob('**/*.{ts,tsx}')
+  const glob = new Bun.Glob('**/*.{ts,tsx,json}')
   const files: string[] = []
   for await (const file of glob.scan({ cwd: process.cwd(), onlyFiles: true })) {
     if (!shouldSkipFile(file)) files.push(file)
@@ -105,10 +105,35 @@ function collectArrowSymbols(
   }
 }
 
+function parseJsonFile(source: string, relPath: string): SymbolEntry[] {
+  try {
+    const parsed = JSON.parse(source)
+    if (typeof parsed !== 'object' || parsed === null) return []
+    const symbols: SymbolEntry[] = []
+    for (const [key, value] of Object.entries(parsed)) {
+      symbols.push({
+        name: key,
+        file: relPath,
+        line: 1,
+        kind: 'JSONProperty',
+        signature: `"${key}": ${Array.isArray(value) ? 'Array' : typeof value}`,
+        doc: ''
+      })
+    }
+    return symbols
+  } catch (err) {
+    console.error(`[Scout] Failed to parse JSON ${relPath}:`, err)
+    return []
+  }
+}
+
 /** Parses a TypeScript file and extracts a flat list of top-level symbols. */
 export async function parseFile(relPath: string): Promise<SymbolEntry[]> {
   try {
     const source = await Bun.file(path.join(process.cwd(), relPath)).text()
+    if (relPath.endsWith('.json')) {
+      return parseJsonFile(source, relPath)
+    }
     const parsed = parseSync(relPath, source)
     const symbols: SymbolEntry[] = []
     const program = parsed.program as unknown as AstNode

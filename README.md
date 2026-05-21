@@ -27,7 +27,7 @@ The diagram below visualizes the seamless end-to-end flow from a user query to t
 
 ```mermaid
 graph TD
-    UserQuery["User Request (e.g. Russian/English)"] --> AIExtract["AI Client: Extract English Keywords"]
+    UserQuery["User Request (e.g. Ukrainian/English)"] --> AIExtract["AI Client: Extract English Keywords"]
     AIExtract --> MCPCall["MCP Server: Call 'find_code'"]
     
     subgraph MCP Server ["smarter-faster-better-mcp Workspace Processing"]

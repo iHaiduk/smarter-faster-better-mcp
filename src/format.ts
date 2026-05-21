@@ -14,6 +14,7 @@ const KIND_SHORT = {
   TSInterfaceDeclaration: 'iface',
   TSTypeAliasDeclaration: 'type',
   ArrowFunctionExpression: 'fn',
+  JSONProperty: 'json',
 } as const satisfies Record<SymbolKind, string>
 
 export function kindShort(kind: SymbolKind): string {
