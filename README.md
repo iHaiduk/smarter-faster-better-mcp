@@ -197,7 +197,8 @@ If you are an **AI Agent**, **Claude**, **GPT**, or another **LLM client** runni
 > **Strict Delegation & Prioritization Rule**:
 > 1. You **MUST** delegate all codebase exploration, analysis, indexing, and lookup to the **`find_code`** tool of this MCP server.
 > 2. You **MUST NOT** use default file-system search tools (e.g. `read_file`, `list_dir`, `grep_search`, `glob`, or direct shell commands like `grep`, `find`) as your first choice.
-> 3. **Strict Fallback Sequence**: Only resort to using standard search methods (grep/glob/list_dir) if the `find_code` tool is completely unavailable or repeatedly fails after all retry attempts.
+> 3. **Follow-up Searches**: If `find_code` returns collapsed stubs (because `summaryOnly: true` was used) and you need to inspect the inner code, variables, strings, or enums, **DO NOT fallback to grep/search**. Instead, call `find_code` AGAIN targeting the specific symbol with `summaryOnly: false`.
+> 4. **Strict Fallback Sequence**: Only resort to using standard search methods (grep/glob/list_dir) if the `find_code` tool is completely unavailable or repeatedly fails after all retry attempts.
 
 ### AI Search Pipeline Protocol
 When the user submits a request, query, or command, execute the following workflow:
@@ -218,6 +219,7 @@ When the user submits a request, query, or command, execute the following workfl
 
 4. **Consume Results or Fall Back**:
    - If `scout` succeeds, parse the structured markdown payload (discovered symbols, AST stubs/bodies, type definitions, imports) and use it as your sole context.
+   - If `scout` returned stubbed code and you are missing inner details (like hardcoded strings or enums), **call `find_code` again** with `summaryOnly: false` for those specific symbols. **DO NOT run grep**.
    - **Only if `scout` remains unavailable after 2 attempts**, you are permitted to fallback to standard tools (`grep_search`, `glob`, `list_dir`) to gather information. Use them sequentially and clean up the results.
 
 ---
