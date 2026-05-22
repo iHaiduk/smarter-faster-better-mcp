@@ -1,8 +1,4 @@
-// Refactored: 2026-05-21 — modern JS/TS
 // Shared AST utilities used by parser and pipeline extraction.
-import * as fs from 'node:fs/promises'
-import * as path from 'node:path'
-
 import { isAstNode, isIdentifier } from './types.js'
 
 import type { AstNode } from './types.js'
@@ -64,70 +60,4 @@ export function getBodyStartOffset(node: AstNode): number | null {
   }
 
   return null
-}
-
-interface ImportDeclarationLike extends AstNode {
-  source: { value: string }
-}
-
-function isImportWithStringSource(node: AstNode): node is ImportDeclarationLike {
-  if (node.type !== 'ImportDeclaration') return false
-  const source = node['source']
-  return (
-    typeof source === 'object' &&
-    source !== null &&
-    typeof (source as { value?: unknown }).value === 'string'
-  )
-}
-
-async function fileExists(absPath: string): Promise<boolean> {
-  try {
-    await fs.access(absPath)
-    return true
-  } catch {
-    return false
-  }
-}
-
-/** Resolves all import specifiers (relative paths converted to .ts/.tsx where applicable). */
-export async function extractFileImports(
-  program: unknown,
-  currentFileRelPath: string,
-): Promise<string[]> {
-  if (!isAstNode(program)) return []
-  const body = program['body']
-  if (!Array.isArray(body)) return []
-
-  const cwd = process.cwd()
-  const dir = path.dirname(currentFileRelPath)
-  const seen = new Set<string>()
-  const tasks: Array<Promise<string>> = []
-
-  for (const node of body) {
-    if (!isAstNode(node) || !isImportWithStringSource(node)) continue
-    const raw = node.source.value
-
-    if (!raw.startsWith('.')) {
-      seen.add(raw)
-      continue
-    }
-
-    const joined = path.join(dir, raw)
-    if (!joined.endsWith('.js') && !joined.endsWith('.jsx')) {
-      seen.add(joined)
-      continue
-    }
-
-    const base = joined.replace(/\.jsx?$/, '')
-    tasks.push(
-      (async () => {
-        if (await fileExists(path.join(cwd, `${base}.ts`))) return `${base}.ts`
-        if (await fileExists(path.join(cwd, `${base}.tsx`))) return `${base}.tsx`
-        return joined
-      })(),
-    )
-  }
-
-  for (const resolved of await Promise.all(tasks)) seen.add(resolved)
-  return [...seen]
 }

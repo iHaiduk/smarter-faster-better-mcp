@@ -1,11 +1,7 @@
-// Refactored: 2026-05-21 — modern JS/TS
-// Keyword + fuzzy filter for the project symbol map.
-// Uses a bigram (Dice) pre-filter so we only pay Levenshtein cost on
-// keywords that have a reasonable chance of matching.
-
+import * as path from 'node:path'
 import { MAX_SYMBOLS_FOR_LLM, STOP_WORDS } from './config.js'
 
-import type { ProjectMap, SymbolEntry } from './types.js'
+import type { ProjectMap, SymbolEntry, LLMCandidate } from './types.js'
 
 const MIN_KEYWORD_LEN = 3
 const FUZZY_MIN_WORD_LEN = 4
@@ -54,16 +50,18 @@ interface KeywordSpec {
   readonly fuzzy: boolean
 }
 
-function prepareKeywords(task: string): KeywordSpec[] {
-  return task
+/** Prepares a list of keywords from a query. */
+export function prepareKeywords(task: string): KeywordSpec[] {
+  const rawWords = task
     .toLowerCase()
     .split(/[\s\W_]+/)
-    .filter((word) => word.length > MIN_KEYWORD_LEN - 1 && !STOP_WORDS.has(word))
-    .map((word) => ({
-      word,
-      grams: bigrams(word),
-      fuzzy: word.length >= FUZZY_MIN_WORD_LEN,
-    }))
+    .filter((word) => word.length >= MIN_KEYWORD_LEN && !STOP_WORDS.has(word))
+
+  return rawWords.map((word) => ({
+    word,
+    grams: bigrams(word),
+    fuzzy: word.length >= FUZZY_MIN_WORD_LEN,
+  }))
 }
 
 function scoreSymbol(sym: SymbolEntry, keywords: readonly KeywordSpec[]): number {
@@ -107,4 +105,95 @@ export function filterMap(map: ProjectMap, task: string): SymbolEntry[] {
     console.error(`[Scout] Truncating filtered map ${result.length} → ${MAX_SYMBOLS_FOR_LLM}`)
   }
   return result.slice(0, MAX_SYMBOLS_FOR_LLM)
+}
+
+function cleanCasing(str: string): string {
+  return str.toLowerCase().replace(/[\s\W_]+/g, '')
+}
+
+/**
+ * Computes deterministic matches using casing mappings, exact symbols, and pattern matching.
+ * Returns LLMCandidates with calculated confidences.
+ */
+export function getDeterministicMatches(
+  map: ProjectMap,
+  task: string,
+  includeTests = false,
+): LLMCandidate[] {
+  const keywords = prepareKeywords(task).map((k) => k.word)
+  if (keywords.length === 0) return []
+
+  const cleanTask = cleanCasing(task)
+  const candidates: LLMCandidate[] = []
+
+  const testSuffixes = ['.test.ts', '.spec.ts', '.test.tsx', '.spec.tsx', '.test.js', '.spec.js']
+
+  for (const sym of map.symbols) {
+    if (!includeTests && testSuffixes.some((sfx) => sym.file.endsWith(sfx))) {
+      continue
+    }
+
+    const cleanSymName = cleanCasing(sym.name)
+    let confidence = 0
+
+    // 1. Exact symbol name in task or vice versa
+    if (cleanTask.includes(cleanSymName) || cleanSymName.includes(cleanTask)) {
+      if (sym.name.toLowerCase() === task.trim().toLowerCase()) {
+        confidence = 1.0
+      } else if (keywords.some((k) => cleanCasing(k) === cleanSymName)) {
+        confidence = 1.0
+      } else {
+        confidence = 0.95
+      }
+    }
+
+    // 2. Compound keyword combination match
+    // E.g. task is "pipeline cache manager", we check if the symbol name matches every word.
+    if (confidence === 0) {
+      const rawWords = task
+        .toLowerCase()
+        .split(/[\s\W_]+/)
+        .filter((word) => word.length >= MIN_KEYWORD_LEN && !STOP_WORDS.has(word))
+
+      if (rawWords.length > 1) {
+        const allGroupsMatched = rawWords.every((rw) => {
+          return cleanSymName.includes(cleanCasing(rw))
+        })
+        if (allGroupsMatched) {
+          confidence = 0.98
+        }
+      }
+    }
+
+    // 4. File name matches
+    if (confidence === 0) {
+      const fileBasename = path.basename(sym.file, path.extname(sym.file)).toLowerCase()
+      const cleanFileBase = cleanCasing(fileBasename)
+      if (keywords.some((k) => cleanFileBase.includes(cleanCasing(k)))) {
+        if (keywords.some((k) => cleanSymName.includes(cleanCasing(k)))) {
+          confidence = 0.8
+        }
+      }
+    }
+
+    if (confidence > 0) {
+      candidates.push({
+        file: sym.file,
+        symbol: sym.name,
+        confidence,
+      })
+    }
+  }
+
+  // Deduplicate and return top candidates sorted by confidence
+  const unique = new Map<string, LLMCandidate>()
+  for (const c of candidates) {
+    const key = `${c.file}::${c.symbol}`
+    const existing = unique.get(key)
+    if (!existing || existing.confidence < c.confidence) {
+      unique.set(key, c)
+    }
+  }
+
+  return [...unique.values()].toSorted((a, b) => b.confidence - a.confidence)
 }

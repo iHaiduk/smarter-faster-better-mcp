@@ -21,20 +21,55 @@ export interface SymbolEntry {
   readonly doc: string
 }
 
+export interface FileImportSpecifier {
+  readonly local: string
+  readonly imported: string
+}
+
+export interface FileImport {
+  readonly source: string
+  readonly resolved: string | null
+  readonly specifiers: readonly FileImportSpecifier[]
+}
+
+export interface FileExport {
+  readonly name: string
+  readonly local: string
+}
+
+export interface FileReExport {
+  readonly source: string
+  readonly resolved: string | null
+  readonly specifiers: readonly FileImportSpecifier[]
+}
+
+export interface FileMetadata {
+  readonly file: string
+  readonly imports: readonly FileImport[]
+  readonly exports: readonly FileExport[]
+  readonly reExports: readonly FileReExport[]
+  readonly declarations: readonly string[]
+}
+
 export interface ProjectMap {
   readonly generatedAt: number
   readonly symbolsCount: number
   readonly symbols: readonly SymbolEntry[]
+  readonly files?: readonly FileMetadata[]
 }
 
 export interface LLMCandidate {
   readonly file: string
   readonly symbol: string
   readonly confidence: number
+  readonly tier?: RelevanceTier
 }
 
-export interface LLMResponse {
-  readonly candidates: readonly LLMCandidate[]
+export type RelevanceTier = 'mustRead' | 'likelyRelevant' | 'dependencyOnly' | 'testsOrExamples' | 'excluded'
+
+export interface CandidateRange {
+  readonly startLine: number
+  readonly endLine: number
 }
 
 export interface ExtractedSymbol {
@@ -49,6 +84,24 @@ export interface ExtractedSymbol {
   endLine?: number
   typeDefs?: readonly string[]
   fullLength?: number
+  relevanceTier?: RelevanceTier
+  candidateRanges?: readonly CandidateRange[]
+}
+
+export interface ContextBudgetOptions {
+  readonly maxFiles?: number
+  readonly maxSymbols?: number
+  readonly maxChars?: number
+  readonly includeTests?: boolean
+}
+
+export interface StructuredOutput {
+  readonly symbols: string
+  readonly deps?: string
+  readonly confidence: number
+  readonly reason: string
+  readonly hints?: string
+  readonly queries?: string
 }
 
 export interface ScoutConfig {
@@ -72,16 +125,6 @@ export interface AstNode {
 export interface AstIdentifier extends AstNode {
   type: 'Identifier'
   name: string
-}
-
-export interface AstProgram extends AstNode {
-  type: 'Program'
-  body: AstNode[]
-}
-
-export interface AstImportDeclaration extends AstNode {
-  type: 'ImportDeclaration'
-  source: { value: string } & AstNode
 }
 
 export const isAstNode = (value: unknown): value is AstNode =>

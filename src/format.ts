@@ -1,11 +1,16 @@
-// Refactored: 2026-05-21 — modern JS/TS
-// Formatting layer: turns Scout state into markdown payloads for the caller LLM.
+import type {
+  ExtractedSymbol,
+  StructuredOutput,
+  SymbolEntry,
+  SymbolKind,
+  ProjectMap,
+} from './types.js'
 
-import type { ExtractedSymbol, SymbolEntry, SymbolKind } from './types.js'
-
-const MAX_DEP_LIST = 8
 const MAX_SIG_CHARS = 80
 const MAX_DOC_CHARS = 60
+const MAX_USED_LIST = 3
+const MAX_STRUCTURED_DEPENDENCIES = 12
+const MAX_FOLLOW_UP_QUERIES = 6
 
 const KIND_SHORT = {
   FunctionDeclaration: 'fn',
@@ -29,29 +34,30 @@ export function formatFound(
   const sections: string[] = ['[Scout: FOUND]']
   for (const ext of extractions) {
     const loc = ext.startLine && ext.endLine ? `:L${ext.startLine}-${ext.endLine}` : ''
-    const lines: string[] = [`## ${ext.candidate.symbol} (${ext.candidate.file}${loc})`]
+    const tierLabel =
+      ext.relevanceTier && ext.relevanceTier !== 'mustRead'
+        ? ` [Tier: ${ext.relevanceTier}]`
+        : ''
+    const lines: string[] = [`## ${ext.candidate.symbol} (${ext.candidate.file}${loc})${tierLabel}`]
 
     if (ext.doc) lines.push(`/* ${ext.doc} */`)
     lines.push(`\`\`\`ts\n${ext.code}\n\`\`\``)
-    if (!ext.extractionOk) lines.push('// ⚠ Exact extraction failed')
+    if (!ext.extractionOk) {
+      lines.push('// ⚠ AST fallback')
+    }
 
     const meta: string[] = []
-    if (ext.imports.length > 0) meta.push(`Deps: ${ext.imports.slice(0, MAX_DEP_LIST).join(', ')}`)
-    if (ext.importedBy.length > 0) meta.push(`Used: ${ext.importedBy.join(', ')}`)
-
-    const gitStatus = gitStatusMap?.get(ext.candidate.file)
-    if (gitStatus) meta.push(`Git: ${gitStatus}`)
-    if (meta.length > 0) lines.push(meta.join(' | '))
-
-    if (ext.typeDefs && ext.typeDefs.length > 0) {
-      lines.push('\n**Associated Types:**')
-      for (const def of ext.typeDefs) lines.push(`\`\`\`ts\n${def}\n\`\`\``)
+    if (ext.importedBy.length > 0) {
+      meta.push(`Used: ${ext.importedBy.slice(0, MAX_USED_LIST).join(', ')}`)
     }
+
+    if (meta.length > 0) lines.push(meta.join(' | '))
 
     sections.push(lines.join('\n'))
   }
   return sections.join('\n---\n')
 }
+
 
 export function formatNotFound(task: string, symbolsCount: number): string {
   return [
@@ -71,7 +77,8 @@ export function formatDegraded(reason: string): string {
     '[Scout: DEGRADED]',
     `Scout encountered an issue: ${reason}`,
     '',
-    'Proceeding without Scout context is safe — continue with your task.',
+    'Retry find_code once with the same task before falling back to filesystem search.',
+    'Only use grep/glob/list_dir/read_file after two failed or degraded Scout attempts.',
     'Check SCOUT_BASE_URL and that your local LLM is running.',
   ].join('\n')
 }
@@ -95,4 +102,95 @@ export function serializeForLLM(symbols: readonly SymbolEntry[]): string {
     }
   }
   return lines.join('\n')
+}
+
+/** Wraps a Markdown output and structured extractions into a unified JSON string payload. */
+export function toStructuredJSON(
+  markdown: string,
+  extractions: readonly ExtractedSymbol[],
+  confidence: number,
+  reason: string,
+  missingContextHints: readonly string[] = [],
+  followUpQueries: readonly string[] = [],
+  map?: ProjectMap,
+): string {
+  // Build pipe-separated symbols table
+  const symbolRows = extractions.map((ext) => {
+    const lines = ext.startLine && ext.endLine ? `${ext.startLine}-${ext.endLine}` : ''
+    const status = ext.extractionOk ? 'ok' : 'fallback'
+    const tier = ext.relevanceTier ?? ''
+    return `${ext.candidate.file}|${ext.candidate.symbol}|${lines}|${tier}|${status}`
+  })
+  const symbolsTable = ['file|symbol|lines|tier|status', ...symbolRows].join('\n')
+
+  // Resolve exact lines for dependencies that are actually used in extracted code
+  const depsWithLines = new Map<string, Set<number>>()
+
+  if (map && map.files) {
+    for (const ext of extractions) {
+      const fileMeta = map.files.find((f) => f.file === ext.candidate.file)
+      if (!fileMeta) continue
+
+      for (const imp of fileMeta.imports) {
+        if (!imp.resolved) continue
+        if (!imp.resolved.startsWith('.') && !imp.resolved.includes('/')) continue
+
+        for (const spec of imp.specifiers) {
+          const regex = new RegExp(`\\b${spec.local}\\b`)
+          if (regex.test(ext.code)) {
+            const sym = map.symbols.find(
+              (s) => s.file === imp.resolved && s.name === spec.imported
+            )
+            if (sym) {
+              let lines = depsWithLines.get(imp.resolved)
+              if (!lines) {
+                lines = new Set<number>()
+                depsWithLines.set(imp.resolved, lines)
+              }
+              lines.add(sym.line)
+            }
+          }
+        }
+      }
+    }
+  }
+
+  let depsString = ''
+  if (depsWithLines.size > 0) {
+    const formattedDeps = [...depsWithLines.entries()].map(([file, lines]) => {
+      const sortedLines = [...lines].toSorted((a, b) => a - b)
+      return `${file}[${sortedLines.join(',')}]`
+    })
+    depsString = formattedDeps.slice(0, MAX_STRUCTURED_DEPENDENCIES).join(',')
+  } else {
+    const fallbackDeps = [
+      ...new Set(
+        extractions
+          .flatMap((ext) => [...ext.imports, ...ext.importedBy])
+          .filter((dep) => dep.startsWith('.') || dep.includes('/')),
+      ),
+    ].slice(0, MAX_STRUCTURED_DEPENDENCIES)
+    depsString = fallbackDeps.join(',')
+  }
+
+  const cleanReason = reason.includes('preflight') ? 'deterministic' : reason.includes('LLM') ? 'llm' : reason
+
+  const structured: StructuredOutput = {
+    symbols: symbolsTable,
+    deps: depsString || undefined,
+    confidence,
+    reason: cleanReason,
+    hints: missingContextHints.length > 0 ? missingContextHints.join(';') : undefined,
+    queries: followUpQueries.length > 0
+      ? followUpQueries
+          .map((q) => q.replace(/^trace_symbol:\s*/, ''))
+          .slice(0, MAX_FOLLOW_UP_QUERIES)
+          .join(',')
+      : undefined,
+  }
+
+  return JSON.stringify({
+    markdown,
+    structuredContent: structured,
+  })
 }

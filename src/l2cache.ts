@@ -1,17 +1,8 @@
-// Refactored: 2026-05-21 — modern JS/TS
-// L2 disk cache for extracted symbols.
-// Keyed by sha-256(file::symbol::summaryOnly); invalidated by source mtime.
-
 import * as path from 'node:path'
+import * as fs from 'node:fs/promises'
 
+import { getCacheDir } from './config.js'
 import type { ExtractedSymbol } from './types.js'
-
-const CACHE_DIR = path.join(process.cwd(), '.scout-cache')
-
-interface CacheEntry {
-  readonly sourceMtimeMs: number
-  readonly value: ExtractedSymbol
-}
 
 function keyFor(file: string, symbol: string, summaryOnly: boolean): string {
   const hasher = new Bun.CryptoHasher('sha256')
@@ -19,13 +10,13 @@ function keyFor(file: string, symbol: string, summaryOnly: boolean): string {
   return hasher.digest('hex')
 }
 
-function entryPath(key: string): string {
-  return path.join(CACHE_DIR, `${key}.json`)
+function entryPath(key: string, targetRoot: string): string {
+  return path.join(getCacheDir(targetRoot), `${key}.json`)
 }
 
-async function getSourceMtime(file: string): Promise<number | null> {
+async function getSourceMtime(file: string, targetRoot: string): Promise<number | null> {
   try {
-    const stat = await Bun.file(path.join(process.cwd(), file)).stat()
+    const stat = await Bun.file(path.join(targetRoot, file)).stat()
     return stat.mtime.getTime()
   } catch {
     return null
@@ -37,14 +28,15 @@ export async function l2Get(
   file: string,
   symbol: string,
   summaryOnly: boolean,
+  targetRoot: string,
 ): Promise<ExtractedSymbol | null> {
   const key = keyFor(file, symbol, summaryOnly)
-  const cacheFile = Bun.file(entryPath(key))
+  const cacheFile = Bun.file(entryPath(key, targetRoot))
   if (!(await cacheFile.exists())) return null
 
   try {
-    const entry = (await cacheFile.json()) as CacheEntry
-    const mtime = await getSourceMtime(file)
+    const entry = (await cacheFile.json()) as { readonly sourceMtimeMs: number; readonly value: ExtractedSymbol }
+    const mtime = await getSourceMtime(file, targetRoot)
     if (mtime === null || mtime > entry.sourceMtimeMs) return null
     return entry.value
   } catch {
@@ -58,24 +50,28 @@ export async function l2Set(
   symbol: string,
   summaryOnly: boolean,
   value: ExtractedSymbol,
+  targetRoot: string,
 ): Promise<void> {
-  const mtime = await getSourceMtime(file)
+  const mtime = await getSourceMtime(file, targetRoot)
   if (mtime === null) return
 
   const key = keyFor(file, symbol, summaryOnly)
-  const entry: CacheEntry = { sourceMtimeMs: mtime, value }
+  const entry = { sourceMtimeMs: mtime, value }
 
   try {
-    await Bun.write(entryPath(key), JSON.stringify(entry))
+    const dir = getCacheDir(targetRoot)
+    await fs.mkdir(dir, { recursive: true })
+    await Bun.write(entryPath(key, targetRoot), JSON.stringify(entry))
   } catch (err) {
     console.error('[Scout] L2 write failed:', err instanceof Error ? err.message : String(err))
   }
 }
 
 /** Wipe the L2 cache directory (best-effort). */
-export async function l2Clear(): Promise<void> {
+export async function l2Clear(targetRoot: string): Promise<void> {
   try {
-    await Bun.spawn(['rm', '-rf', CACHE_DIR]).exited
+    const dir = getCacheDir(targetRoot)
+    await Bun.spawn(['rm', '-rf', dir]).exited
   } catch {
     // ignored: cleanup is best-effort
   }

@@ -3,7 +3,8 @@ import * as path from 'node:path'
 
 import type { ScoutConfig } from './types.js'
 
-export const MAP_FILE = path.join(process.cwd(), '.project_map.json')
+export const getMapFilePath = (targetRoot: string): string => path.join(targetRoot, '.project_map.json')
+export const getCacheDir = (targetRoot: string): string => path.join(targetRoot, '.scout-cache')
 
 export const MAX_SYMBOLS = 2000
 export const MAX_SYMBOLS_FOR_LLM = 150
@@ -18,10 +19,9 @@ export const STOP_WORDS: ReadonlySet<string> = new Set([
 
 // System prompt: STRICTLY <= 200 tokens. Small models fail on large prompts.
 export const SYSTEM_PROMPT = `You are a code search assistant.
-Given a symbol map and task, find matching symbols.
-Output ONLY valid JSON. No markdown. No explanation.
-Format: {"candidates":[{"file":"path.ts","symbol":"Name","confidence":0.9}]}
-Max 5 candidates. confidence: 1.0=certain, 0.5=possible. Use exact paths from map.`
+Given a symbol map and task, find matching symbols and assign a relevance tier.
+Tiers: "mustRead" (direct match/to edit), "likelyRelevant" (very relevant), "dependencyOnly" (just dependency/stub only).
+Output ONLY valid JSON. Format: {"candidates":[{"file":"path.ts","symbol":"Name","confidence":0.9,"tier":"mustRead"}]}`
 
 const DEFAULTS = {
   llmTimeoutMs: 30_000,

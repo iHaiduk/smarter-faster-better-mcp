@@ -1,7 +1,7 @@
 // Refactored: 2026-05-21 — modern JS/TS
 import { describe, expect, test } from 'bun:test'
 
-import { formatDegraded, formatFound, formatNotFound, kindShort, serializeForLLM } from '../format.js'
+import { formatDegraded, formatFound, formatNotFound, kindShort, serializeForLLM, toStructuredJSON } from '../format.js'
 
 import type { ExtractedSymbol, SymbolEntry } from '../types.js'
 
@@ -29,24 +29,37 @@ describe('kindShort', () => {
 })
 
 describe('formatFound', () => {
-  test('renders header, doc, code, deps, used and line range', () => {
+  test('renders header, doc, code, used and line range', () => {
     const out = formatFound([baseExtraction])
     expect(out).toContain('[Scout: FOUND]')
     expect(out).toContain('## userCache (src/cache.ts:L10-20)')
     expect(out).toContain('/* Cache users */')
     expect(out).toContain('```ts')
-    expect(out).toContain('Deps: ./types.js')
     expect(out).toContain('Used: src/index.ts')
   })
 
   test('flags failed extractions with warning sigil', () => {
     const out = formatFound([{ ...baseExtraction, extractionOk: false }])
-    expect(out).toContain('⚠ Exact extraction failed')
+    expect(out).toContain('⚠ AST fallback')
   })
 
-  test('injects git status when provided', () => {
+  test('omits git status even when provided', () => {
     const out = formatFound([baseExtraction], new Map([['src/cache.ts', 'M']]))
-    expect(out).toContain('Git: M')
+    expect(out).not.toContain('Git: M')
+  })
+
+  test('omits mustRead tier label but keeps non-default tiers', () => {
+    const mustRead = formatFound([{ ...baseExtraction, relevanceTier: 'mustRead' }])
+    const dependencyOnly = formatFound([{ ...baseExtraction, relevanceTier: 'dependencyOnly' }])
+
+    expect(mustRead).not.toContain('[Tier: mustRead]')
+    expect(dependencyOnly).toContain('[Tier: dependencyOnly]')
+  })
+
+  test('does not inline associated types in markdown output', () => {
+    const out = formatFound([{ ...baseExtraction, typeDefs: ['type:X\ninterface X {}'] }])
+    expect(out).not.toContain('**Associated Types:**')
+    expect(out).not.toContain('interface X')
   })
 })
 
@@ -58,10 +71,11 @@ describe('formatNotFound', () => {
 })
 
 describe('formatDegraded', () => {
-  test('always tells the caller it is safe to proceed', () => {
+  test('tells the caller to retry before filesystem fallback', () => {
     const out = formatDegraded('boom')
     expect(out).toContain('[Scout: DEGRADED]')
-    expect(out).toContain('safe — continue')
+    expect(out).toContain('Retry find_code once')
+    expect(out).toContain('after two failed or degraded Scout attempts')
   })
 })
 
@@ -81,5 +95,83 @@ describe('serializeForLLM', () => {
     const out = serializeForLLM(symbols)
     expect(out).toContain('cls: class B — docs')
     expect(out).toContain('type: type C = string')
+  })
+})
+
+describe('toStructuredJSON', () => {
+  test('compacts structured symbols into tabular format and comma-separated deps list', () => {
+    const out = toStructuredJSON('md', [{ ...baseExtraction, typeDefs: ['type:X'], relevanceTier: 'mustRead' }], 0.9, 'why')
+    const parsed = JSON.parse(out) as {
+      markdown: string
+      structuredContent: {
+        symbols: string
+        deps: string
+        confidence: number
+        reason: string
+      }
+    }
+
+    expect(parsed.markdown).toBe('md')
+    expect(parsed.structuredContent.symbols).toContain('file|symbol|lines|tier|status')
+    expect(parsed.structuredContent.symbols).toContain('src/cache.ts|userCache|10-20|mustRead|ok')
+    expect(parsed.structuredContent.deps).toContain('./types.js')
+    expect(parsed.structuredContent.deps).toContain('src/index.ts')
+    expect(parsed.structuredContent.confidence).toBe(0.9)
+    expect(parsed.structuredContent.reason).toBe('why')
+  })
+
+  test('resolves exact dependency lines when ProjectMap is provided and imports are used', () => {
+    const mockMap = {
+      generatedAt: Date.now(),
+      symbolsCount: 1,
+      symbols: [
+        {
+          name: 'SymbolA',
+          file: 'src/dep.ts',
+          line: 42,
+          kind: 'FunctionDeclaration' as const,
+          signature: 'export function SymbolA()',
+          doc: 'Do A',
+        },
+      ],
+      files: [
+        {
+          file: 'src/cache.ts',
+          imports: [
+            {
+              source: './dep.js',
+              resolved: 'src/dep.ts',
+              specifiers: [
+                {
+                  local: 'SymbolA',
+                  imported: 'SymbolA',
+                },
+              ],
+            },
+          ],
+          exports: [],
+          reExports: [],
+          declarations: [],
+        },
+      ],
+    }
+
+    const extractionWithImportUse: ExtractedSymbol = {
+      ...baseExtraction,
+      code: 'function userCache() { SymbolA(); }',
+    }
+
+    const out = toStructuredJSON(
+      'md',
+      [extractionWithImportUse],
+      0.9,
+      'why',
+      [],
+      [],
+      mockMap,
+    )
+    const parsed = JSON.parse(out)
+
+    expect(parsed.structuredContent.deps).toBe('src/dep.ts[42]')
   })
 })

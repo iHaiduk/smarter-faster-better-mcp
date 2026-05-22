@@ -28,3 +28,60 @@ describe('cleanJSON', () => {
     expect(cleanJSON('  hello  ')).toBe('hello')
   })
 })
+
+describe('askCheapLLM tier parsing', () => {
+  test('correctly parses and preserves candidates with relevance tiers', async () => {
+    const originalFetch = global.fetch
+    
+    // Mock fetch response
+    global.fetch = (async () => {
+      return {
+        ok: true,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: JSON.stringify({
+                  candidates: [
+                    { file: 'src/config.ts', symbol: 'SYSTEM_PROMPT', confidence: 0.95, tier: 'mustRead' },
+                    { file: 'src/llm.ts', symbol: 'askCheapLLM', confidence: 0.8, tier: 'dependencyOnly' }
+                  ]
+                })
+              }
+            }
+          ]
+        })
+      } as unknown as Response
+    }) as unknown as typeof fetch
+
+    try {
+      const { askCheapLLM } = await import('../llm.js')
+      const result = await askCheapLLM(
+        'search',
+        ['File: a.ts\nfn: x'],
+        '',
+        {
+          baseUrl: 'http://localhost:11434/v1',
+          apiKey: 'ollama',
+          model: 'llama3.1:8b',
+          llmTimeoutMs: 1000,
+          confidenceThreshold: 0.5,
+          llmParallelism: 1,
+        }
+      )
+
+      expect(result).not.toBeNull()
+      expect(result!.length).toBe(2)
+      
+      const systemPromptCand = result!.find(c => c.symbol === 'SYSTEM_PROMPT')
+      expect(systemPromptCand).toBeDefined()
+      expect(systemPromptCand!.tier).toBe('mustRead')
+      
+      const askCheapCand = result!.find(c => c.symbol === 'askCheapLLM')
+      expect(askCheapCand).toBeDefined()
+      expect(askCheapCand!.tier).toBe('dependencyOnly')
+    } finally {
+      global.fetch = originalFetch
+    }
+  })
+})

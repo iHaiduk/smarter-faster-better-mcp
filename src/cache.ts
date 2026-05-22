@@ -1,5 +1,4 @@
-// Refactored: 2026-05-21 — modern JS/TS
-import { MAP_FILE } from './config.js'
+import { getMapFilePath } from './config.js'
 
 import type { ExtractedSymbol } from './types.js'
 
@@ -20,8 +19,9 @@ export function clearL1(): void {
 const STALE_FALLBACK_MS = 5 * 60 * 1000
 
 /** Returns true when any tracked file is newer than the cached project map. */
-export async function isCacheStale(): Promise<boolean> {
-  const mapFile = Bun.file(MAP_FILE)
+export async function isCacheStale(targetRoot: string): Promise<boolean> {
+  const mapPath = getMapFilePath(targetRoot)
+  const mapFile = Bun.file(mapPath)
   if (!(await mapFile.exists())) return true
 
   try {
@@ -29,15 +29,22 @@ export async function isCacheStale(): Promise<boolean> {
     const proc = Bun.spawn(
       [
         'find', '.',
-        '-newer', MAP_FILE,
-        '(', '-name', '*.ts', '-o', '-name', '*.tsx', ')',
+        '-newer', mapPath,
+        '(',
+        '-name', '*.ts',
+        '-o', '-name', '*.tsx',
+        '-o', '-name', '*.js',
+        '-o', '-name', '*.jsx',
+        '-o', '-name', '*.json',
+        ')',
         '-not', '-path', '*/node_modules/*',
         '-not', '-path', '*/.git/*',
+        '-not', '-path', '*/.scout-cache/*',
         '-not', '-path', '*/dist/*',
         '-not', '-path', '*/build/*',
         '-print', '-quit',
       ],
-      { stdout: 'pipe', stderr: 'ignore' },
+      { stdout: 'pipe', stderr: 'ignore', cwd: targetRoot },
     )
     const out = await new Response(proc.stdout).text()
     return out.trim().length > 0

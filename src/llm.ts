@@ -2,9 +2,17 @@
 // Cheap-LLM client + JSON cleanup. Re-exports getGitHint for back-compat.
 import { SYSTEM_PROMPT } from './config.js'
 
-import type { LLMCandidate, LLMResponse, ScoutConfig } from './types.js'
+import type { LLMCandidate, RelevanceTier, ScoutConfig } from './types.js'
 
 export { getGitHint } from './git.js'
+
+const VALID_TIERS: ReadonlySet<RelevanceTier> = new Set([
+  'mustRead',
+  'likelyRelevant',
+  'dependencyOnly',
+  'testsOrExamples',
+  'excluded',
+])
 
 interface ChatCompletionResponse {
   readonly choices: ReadonlyArray<{ readonly message?: { readonly content?: string } }>
@@ -76,10 +84,11 @@ async function singleLLMRequest(
     }
 
     const data = (await res.json()) as ChatCompletionResponse
-    const raw = data.choices.at(0)?.message?.content ?? ''
+    const firstChoice = data.choices.at(0)
+    const raw = firstChoice?.message?.content ?? ''
     
     if (!raw.trim()) {
-      if (data.choices.at(0)?.message && 'tool_calls' in data.choices[0].message) {
+      if (firstChoice?.message && 'tool_calls' in firstChoice.message) {
         console.error('[Scout] LLM returned tool calls instead of text content. Retrying with higher temperature might help.')
       }
       return null
@@ -129,6 +138,7 @@ async function singleLLMRequest(
             file,
             symbol: c.symbol,
             confidence: typeof c.confidence === 'number' ? c.confidence : 1.0,
+            tier: VALID_TIERS.has(c.tier as RelevanceTier) ? (c.tier as RelevanceTier) : undefined,
           } as LLMCandidate
         }
         return null

@@ -1,68 +1,69 @@
-// Refactored: 2026-05-21 — modern JS/TS
-// Finds files referencing a symbol using ripgrep --word-regexp.
-// Skips noisy short names (e.g., "Map", "Set") that would generate
-// false positives without semantic resolution.
+import * as path from 'node:path'
 
-interface RgMatchLine {
-  readonly type: string
-  readonly data?: { readonly path?: { readonly text?: string } }
-}
+import type { ProjectMap } from './types.js'
 
 const MAX_DEP_FILES = 5
-const MIN_SYMBOL_LENGTH = 4
 
-// Names too common in any JS/TS codebase — searching them yields noise.
-const NOISY_NAMES: ReadonlySet<string> = new Set([
-  'Map', 'Set', 'Array', 'Object', 'String', 'Number', 'Boolean',
-  'Date', 'Error', 'Promise', 'JSON', 'Math', 'URL', 'User', 'Data',
-  'Item', 'Node', 'List', 'Type', 'Value', 'Key', 'Name', 'Result',
-])
-
-function isNoisy(symbol: string): boolean {
-  return symbol.length < MIN_SYMBOL_LENGTH || NOISY_NAMES.has(symbol)
-}
-
-function safeJsonParse<T>(raw: string): T | null {
-  try {
-    return JSON.parse(raw) as T
-  } catch {
-    return null
-  }
-}
-
-/** Returns up to 5 files (excluding `excludeFile`) referencing `symbolName` as a whole word. */
-export async function findDeps(symbolName: string, excludeFile: string): Promise<string[]> {
-  if (isNoisy(symbolName)) return []
-
-  try {
-    const proc = Bun.spawn(
-      [
-        'rg', '--json',
-        '--word-regexp',
-        '-l',
-        '--type', 'ts',
-        '--glob', '!node_modules',
-        '--glob', '!dist',
-        '--glob', '!build',
-        '--', symbolName, '.',
-      ],
-      { stdout: 'pipe', stderr: 'ignore', cwd: process.cwd() },
-    )
-
-    const out = await new Response(proc.stdout).text()
-    const seen = new Set<string>()
-
-    for (const line of out.split('\n')) {
-      if (!line) continue
-      const parsed = safeJsonParse<RgMatchLine>(line)
-      const text = parsed?.type === 'match' ? parsed.data?.path?.text : undefined
-      if (text && text !== excludeFile) seen.add(text)
-      if (seen.size >= MAX_DEP_FILES) break
-    }
-
-    return [...seen]
-  } catch {
-    console.error(`[Scout] rg not available, skipping deps for ${symbolName}`)
+/**
+ * Finds up to 5 files referencing `symbolName` from `sourceFile` by traversing
+ * the project's parsed AST import/export graph.
+ */
+export async function findDeps(
+  symbolName: string,
+  sourceFile: string,
+  map?: ProjectMap,
+): Promise<string[]> {
+  if (!map || !map.files) {
     return []
   }
+
+  const seenImporters = new Set<string>()
+  const queue: { file: string; symbol: string }[] = [{ file: sourceFile, symbol: symbolName }]
+  const processed = new Set<string>()
+
+  while (queue.length > 0 && seenImporters.size < MAX_DEP_FILES) {
+    const current = queue.shift()!
+    const key = `${current.file}::${current.symbol}`
+    if (processed.has(key)) continue
+    processed.add(key)
+
+    for (const fMeta of map.files) {
+      if (seenImporters.size >= MAX_DEP_FILES) break
+
+      // 1. Direct Imports
+      for (const imp of fMeta.imports) {
+        if (imp.resolved === current.file) {
+          // Check if it imports our symbol
+          const spec = imp.specifiers.find(
+            (s) => s.imported === current.symbol || s.imported === '*',
+          )
+          if (spec) {
+            seenImporters.add(fMeta.file)
+            // Recursively trace if they import it under a local name
+            queue.push({ file: fMeta.file, symbol: spec.local })
+          }
+        }
+      }
+
+      // 2. Named or Wildcard Re-exports
+      for (const reExp of fMeta.reExports) {
+        if (reExp.resolved === current.file) {
+          if (reExp.specifiers.length === 0) {
+            // Wildcard export * from './module'
+            // This re-exports current.symbol under the same name
+            queue.push({ file: fMeta.file, symbol: current.symbol })
+          } else {
+            // Named re-export e.g. export { x as y } from './module'
+            const spec = reExp.specifiers.find((s) => s.imported === current.symbol)
+            if (spec) {
+              queue.push({ file: fMeta.file, symbol: spec.local })
+            }
+          }
+        }
+      }
+    }
+  }
+
+  seenImporters.delete(sourceFile)
+  return [...seenImporters].slice(0, MAX_DEP_FILES)
 }

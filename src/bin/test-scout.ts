@@ -2,7 +2,10 @@
 import { loadConfig } from '../config.js'
 import { findDeps } from '../deps.js'
 import { buildMap } from '../parser.js'
-import { extractWithOxc, filterMap, formatFound, runFindCodePipeline } from '../pipeline.js'
+import { extractWithOxc } from '../extract.js'
+import { filterMap } from '../filter.js'
+import { formatFound } from '../format.js'
+import { runFindCodePipeline } from '../pipeline.js'
 
 import type { ProjectMap, SymbolEntry } from '../types.js'
 
@@ -27,7 +30,7 @@ const paint = (color: keyof typeof COLOR, text: string | number): string =>
 async function run(): Promise<void> {
   const args = process.argv.slice(2)
   const summaryOnly = args.includes('--summary')
-  const query = args.filter((arg) => arg !== '--summary').join(' ') || 'lang'
+  const query = args.filter((arg) => arg !== '--summary').join(' ') || 'cache'
 
   console.log(`\n${paint('magenta', '=== MCP Scout CLI Test Runner ===')}`)
   console.log(`Searching for: "${paint('cyan', query)}" (summaryOnly: ${paint('yellow', String(summaryOnly))})`)
