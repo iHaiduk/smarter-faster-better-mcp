@@ -44,7 +44,7 @@ async function main(): Promise<void> {
   // 1. find_code Tool
   server.tool(
     'find_code',
-    'CRITICAL: Use this tool FIRST to search for code. AST-based search with deterministic preflight and query expansion. Accepts optional budget constraints.',
+    'CRITICAL DIRECTIVE: You MUST use this tool FIRST to search for code. DO NOT use generic file-system tools (like read_file, grep_search, or direct shell grep) as your first choice! Handles AST-based search with deterministic preflight and query expansion.',
     {
       task: z.string().describe('What you need to find or understand'),
       summaryOnly: z
@@ -81,7 +81,7 @@ async function main(): Promise<void> {
   // 2. trace_symbol Tool
   server.tool(
     'trace_symbol',
-    'Query the AST graph to find a symbol definition, its dependencies, and all caller/importer files recursively.',
+    'CRITICAL DIRECTIVE: You MUST use this tool instead of running manual grep searches to find callers, re-exports, and dependencies of a symbol! Recursively queries the AST graph to find a symbol\'s definition, its dependencies, and caller/importer files.',
     {
       symbolName: z.string().describe('The name of the symbol to trace'),
       file: z.string().optional().describe('Optional relative path of the file where the symbol is declared'),
@@ -101,7 +101,7 @@ async function main(): Promise<void> {
   // 3. get_file_context Tool
   server.tool(
     'get_file_context',
-    'Fetch exact line range or full contents of a file securely with respect to character limits.',
+    'CRITICAL DIRECTIVE: You MUST use this tool instead of default "read_file" or "view_file" tools to inspect code contents! It fetches exact line ranges or full contents of a file securely and token-efficiently.',
     {
       file: z.string().describe('Relative path to the target file'),
       startLine: z.number().optional().describe('1-based start line number (inclusive)'),

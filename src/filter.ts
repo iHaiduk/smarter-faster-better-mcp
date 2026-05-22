@@ -138,12 +138,18 @@ export function getDeterministicMatches(
 
     // 1. Exact symbol name in task or vice versa
     if (cleanTask.includes(cleanSymName) || cleanSymName.includes(cleanTask)) {
-      if (sym.name.toLowerCase() === task.trim().toLowerCase()) {
+      const isExactMatch = sym.name.toLowerCase() === task.trim().toLowerCase()
+      const isSingleWordQuery = keywords.length === 1 && keywords[0] === cleanSymName
+
+      if (sym.kind === 'JSONProperty') {
+        confidence = isExactMatch ? 0.9 : 0.5
+      } else if (isExactMatch) {
         confidence = 1.0
-      } else if (keywords.some((k) => cleanCasing(k) === cleanSymName)) {
+      } else if (isSingleWordQuery) {
         confidence = 1.0
       } else {
-        confidence = 0.95
+        const isOneOfManyKeywords = keywords.length > 1 && keywords.some((k) => cleanCasing(k) === cleanSymName)
+        confidence = isOneOfManyKeywords ? 0.8 : 0.9
       }
     }
 
