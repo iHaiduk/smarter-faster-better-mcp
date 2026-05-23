@@ -35,8 +35,8 @@
     "build": "bun build src/index.ts --outfile dist/index.js --target node --format esm --packages=external && bun build src/bin/test-scout.ts --outdir dist/bin --target node --format esm --packages=external",
     "check": "tsc --noEmit",
     "prepack": "npm run check && npm run build",
-    "scout": "npm run build --silent && node dist/bin/test-scout.js cache",
-    "scout:summary": "npm run build --silent && node dist/bin/test-scout.js cache --summary",
+    "scout": "bun run src/bin/test-scout.ts cache",
+    "scout:summary": "bun run src/bin/test-scout.ts cache --summary",
     "test": "bun test"
   },
   "dependencies": {
