@@ -1,12 +1,12 @@
 import { describe, expect, test } from 'bun:test'
 import * as path from 'node:path'
-import { runFindCodePipeline } from '../pipeline.js'
+import { runFindCodePipeline } from '../pipeline/index.js'
 import type { ScoutConfig } from '../types.js'
 
 const mockConfig: ScoutConfig = {
-  baseUrl: 'http://localhost:11434/v1',
-  apiKey: 'ollama',
-  model: 'llama3.1:8b',
+  baseUrl: 'http://localhost:1234/v1',
+  apiKey: 'lm-studio',
+  model: 'openai/gpt-oss-20b',
   llmTimeoutMs: 1000,
   confidenceThreshold: 0.5,
   llmParallelism: 1,
@@ -15,7 +15,7 @@ const mockConfig: ScoutConfig = {
 describe('runFindCodePipeline with Custom Search', () => {
   test('successfully performs custom regex/word search on project files', async () => {
     const root = path.resolve(import.meta.dir, '../..')
-    const query = '"cleanJSON" in src/llm.ts'
+    const query = '"cleanJSON" in src/extraction/llm.ts'
     
     const result = await runFindCodePipeline(query, mockConfig, false, root)
     const parsed = JSON.parse(result)
@@ -24,13 +24,13 @@ describe('runFindCodePipeline with Custom Search', () => {
     expect(parsed).toHaveProperty('structuredContent')
     expect(parsed.markdown).toContain('[Scout: FOUND]')
     expect(parsed.markdown).toContain('## Match@L')
-    expect(parsed.markdown).toContain('src/llm.ts')
+    expect(parsed.markdown).toContain('src/extraction/llm.ts')
     expect(parsed.markdown).toContain('cleanJSON')
 
     const structured = parsed.structuredContent
-    expect(structured.symbols).toContain('src/llm.ts|Match@L')
+    expect(structured.symbols).toContain('src/extraction/llm.ts|Match@L')
     expect(structured.confidence).toBe(1.0)
-    expect(structured.reason).toBe('Keyword/regex search matching "cleanJSON" in "src/llm.ts"')
+    expect(structured.reason).toBe('Keyword/regex search matching "cleanJSON" in "src/extraction/llm.ts"')
   })
 
   test('returns empty results if no match is found for search query', async () => {

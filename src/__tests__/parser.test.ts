@@ -1,7 +1,7 @@
 // Refactored: 2026-05-21 — modern JS/TS
 import { describe, expect, test } from 'bun:test'
 
-import { extractJSDoc } from '../parser.js'
+import { extractJSDoc } from '../indexing/parser/jsdoc.js'
 
 describe('extractJSDoc', () => {
   test('extracts JSDoc immediately preceding a symbol', () => {

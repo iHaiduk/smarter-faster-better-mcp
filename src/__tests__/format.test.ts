@@ -56,6 +56,12 @@ describe('formatFound', () => {
     expect(dependencyOnly).toContain('[Tier: dependencyOnly]')
   })
 
+  test('outputs signature instead of full code for non-mustRead tiers', () => {
+    const out = formatFound([{ ...baseExtraction, relevanceTier: 'likelyRelevant' }])
+    expect(out).toContain(baseExtraction.signature)
+    expect(out).not.toContain(baseExtraction.code)
+  })
+
   test('does not inline associated types in markdown output', () => {
     const out = formatFound([{ ...baseExtraction, typeDefs: ['type:X\ninterface X {}'] }])
     expect(out).not.toContain('**Associated Types:**')

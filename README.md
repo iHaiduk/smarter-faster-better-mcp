@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![Bun Version](https://img.shields.io/badge/Bun-%3E%3D1.1.0-blue.svg?style=flat-square&logo=bun)](https://bun.sh/)
 
-A blazing fast, ultra-lightweight **Model Context Protocol (MCP)** server for **AST-based code intelligence and semantic discovery**. Powered by **Bun** and **oxc-parser** with zero native build dependencies, it enables seamless code searching and dependency mapping optimized for small local LLMs (like `llama3.1:8b` via Ollama) and giant commercial models alike.
+A blazing fast, ultra-lightweight **Model Context Protocol (MCP)** server for **AST-based code intelligence and semantic discovery**. It runs as compiled Node.js JavaScript for `npx`, uses **oxc-parser** by default for JavaScript/TypeScript, and can opt into **web-tree-sitter** for polyglot repositories.
 
 ---
 
@@ -13,7 +13,7 @@ A blazing fast, ultra-lightweight **Model Context Protocol (MCP)** server for **
 Traditional codebase analysis tools force LLMs to traverse directories, read raw files, and manually resolve references. This wastes thousands of tokens, causes context overflow, and is extremely slow. 
 
 **MCP Scout** takes a smarter approach to performance:
-1. **Zero Native Bindings**: Powered by the Rust-based `oxc-parser`. It installs in milliseconds without needing `node-gyp` or C++ compiler flags and parses files instantly.
+1. **Zero Native Bindings by Default**: Powered by the Rust-based `oxc-parser` for JS/TS. It installs in milliseconds without needing `node-gyp` or C++ compiler flags and parses files instantly.
 2. **Deterministic String Filtering**: Employs rapid Jaro-Winkler edit distance and stop-word filtering to narrow down thousands of project symbols to the most relevant candidates instantly before hitting the LLM.
 3. **LLM Chunk Parallelism**: Chunks the compact symbol map and distributes requests in parallel. This enables inexpensive, local, and low-latency LLMs to categorize symbols accurately without context limits.
 4. **AST Extraction & Code Collapsing**: Extracts precise function and class bodies directly via AST parsing. The `summaryOnly` mode collapses bodies into stubs, retaining context while saving up to 90% of tokens.
@@ -21,8 +21,9 @@ Traditional codebase analysis tools force LLMs to traverse directories, read raw
 
 ## 📂 Supported File Types & Projects
 
-The MCP Scout AST parser is purposefully designed to index modern web and Node.js projects:
-- **Supported Extensions:** `.ts`, `.tsx`, `.js`, `.jsx`, and `.json`.
+The MCP Scout parser defaults to modern web and Node.js projects, with an optional polyglot parser mode:
+- **Default `oxc` mode:** `.ts`, `.tsx`, `.js`, `.jsx`, and `.json`.
+- **Optional `tree-sitter` mode:** Adds `.py`, `.go`, `.dart`, `.rs`, `.rb`, `.java`, `.c`, `.cpp`, `.h`, `.hpp`, `.cs`, and `.php`. JS/TS files still use OXC in this mode.
 - **Exclusions:** Automatically ignores build output and noisy directories (`node_modules/`, `dist/`, `build/`, `.git/`, `coverage/`) as well as test files (unless explicitly requested via tool arguments).
 - **Project Structure:** Seamlessly supports Next.js, React, Vue, Express, and standard TypeScript/JavaScript workspaces, automatically resolving paths based on `tsconfig.json` `paths` and `baseUrl`.
 
@@ -72,21 +73,21 @@ graph TD
 ## 📦 Requirements & Installation
 
 ### Requirements
-- **Bun** >= 1.1.0 (Highly recommended)
-- **Node.js** >= 18 (If running/developing with Node)
+- **Node.js** >= 18
+- **Bun** >= 1.1.0 (for the repository test runner)
 - **Ripgrep (`rg`)** (For symbol dependency lookup)
 
 ### Quick Run (Global / No Installation)
-You can run the server directly using `bunx` inside your MCP configuration without installing it locally:
+You can run the server directly using `npx` inside your MCP configuration without installing it locally:
 ```bash
-bunx smarter-faster-better-mcp
+npx smarter-faster-better-mcp
 ```
 
 ### Installation
 
-#### Global Install (via Bun)
+#### Global Install
 ```bash
-bun install -g smarter-faster-better-mcp
+npm install -g smarter-faster-better-mcp
 ```
 
 #### Local Install as a Dependency
@@ -108,6 +109,13 @@ The server expects configuration parameters via environment variables.
 | `SCOUT_LLM_TIMEOUT_MS` | Max wait time for LLM classification | `30000` | No |
 | `SCOUT_CONFIDENCE_THRESHOLD` | Minimum confidence score to extract a symbol (0.0 to 1.0) | `0.5` | No |
 | `SCOUT_LLM_PARALLELISM` | Number of concurrent requests sent to local LLM | `2` | No |
+| `SCOUT_PARSER` | Parser mode: `oxc` or `tree-sitter` | `oxc` | No |
+
+You can also enable polyglot parsing with a CLI flag:
+
+```bash
+npx smarter-faster-better-mcp --parser tree-sitter
+```
 
 ---
 
@@ -123,7 +131,7 @@ Add the following to your configuration file (usually at `~/Library/Application 
 {
   "mcpServers": {
     "scout": {
-      "command": "bunx",
+      "command": "npx",
       "args": ["smarter-faster-better-mcp"],
       "env": {
         "SCOUT_BASE_URL": "http://localhost:11434/v1",
@@ -149,7 +157,7 @@ If your client has issues parsing the standard `env` block (which causes the MCP
     SCOUT_API_KEY=lm-studio
     SCOUT_MODEL=openai/gpt-oss-20b
     SCOUT_LLM_PARALLELISM=2
-    bunx
+    npx
     smarter-faster-better-mcp
     ```
 
@@ -162,7 +170,7 @@ Or in JSON format (e.g. `.mcp.json` or `.code-review-graph` configs):
     "SCOUT_API_KEY=lm-studio",
     "SCOUT_MODEL=openai/gpt-oss-20b",
     "SCOUT_LLM_PARALLELISM=2",
-    "bunx",
+    "npx",
     "smarter-faster-better-mcp"
   ]
 }
@@ -172,7 +180,7 @@ Or in JSON format (e.g. `.mcp.json` or `.code-review-graph` configs):
 
 Add the server to Claude Code with inline environment variables by executing:
 ```bash
-claude mcp add scout bunx smarter-faster-better-mcp \
+claude mcp add scout npx smarter-faster-better-mcp \
   -e SCOUT_BASE_URL=http://127.0.0.1:1234/v1 \
   -e SCOUT_API_KEY=lm-studio \
   -e SCOUT_MODEL=openai/gpt-oss-20b \
@@ -238,7 +246,8 @@ If you are contributing to MCP Scout or want to test modifications locally:
 
 ### Run in Development Mode
 ```bash
-bun run src/index.ts
+npm run build
+node dist/index.js
 ```
 
 ### Direct JSON-RPC Stdin Smoke Test
@@ -246,13 +255,13 @@ You can simulate an MCP JSON-RPC call directly from your terminal:
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"find_code","arguments":{"task":"database connection"}}}' \
   | SCOUT_BASE_URL=http://localhost:11434/v1 SCOUT_API_KEY=ollama SCOUT_MODEL=llama3.1:8b \
-    bun run src/index.ts
+    node dist/index.js
 ```
 
 ### Interactive MCP Inspector
 To debug using the official browser-based MCP inspector:
 ```bash
-npx @modelcontextprotocol/inspector bun src/index.ts
+npx @modelcontextprotocol/inspector node dist/index.js
 ```
 
 ## 📄 License

@@ -1,11 +1,11 @@
 // Refactored: 2026-05-21 — modern JS/TS
 import { loadConfig } from '../config.js'
 import { findDeps } from '../deps.js'
-import { buildMap } from '../parser.js'
+import { buildMap } from '../indexing/symbol-map/build-map.js'
 import { extractWithOxc } from '../extract.js'
 import { filterMap } from '../filter.js'
 import { formatFound } from '../format.js'
-import { runFindCodePipeline } from '../pipeline.js'
+import { runFindCodePipeline } from '../pipeline/index.js'
 
 import type { ProjectMap, SymbolEntry } from '../types.js'
 

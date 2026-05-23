@@ -61,12 +61,13 @@ describe('askCheapLLM tier parsing', () => {
         ['File: a.ts\nfn: x'],
         '',
         {
-          baseUrl: 'http://localhost:11434/v1',
-          apiKey: 'ollama',
-          model: 'llama3.1:8b',
+          baseUrl: 'http://localhost:1234/v1',
+          apiKey: 'lm-studio',
+          model: 'openai/gpt-oss-20b',
           llmTimeoutMs: 1000,
           confidenceThreshold: 0.5,
           llmParallelism: 1,
+          parser: 'oxc'
         }
       )
 
