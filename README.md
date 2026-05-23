@@ -19,19 +19,34 @@ Traditional codebase analysis tools force LLMs to traverse directories, read raw
 4. **AST Extraction & Code Collapsing**: Extracts precise function and class bodies directly via AST parsing. The `summaryOnly` mode collapses bodies into stubs, retaining context while saving up to 90% of tokens.
 5. **AST + Regex Dependency Mapping**: Automatically traces exact dependency imports through AST analysis and crawls the workspace using `ripgrep` (`rg`) for rapid fallback symbol mapping.
 
-## 📂 Supported File Types & Projects
+## 📂 Supported File Types & Parser Engines
 
-The MCP Scout parser defaults to modern web and Node.js projects, with an optional polyglot parser mode:
-- **Default `oxc` mode:** `.ts`, `.tsx`, `.js`, `.jsx`, and `.json`.
-- **Optional `tree-sitter` mode:** Adds `.py`, `.go`, `.dart`, `.rs`, `.rb`, `.java`, `.c`, `.cpp`, `.h`, `.hpp`, `.cs`, and `.php`. JS/TS files still use OXC in this mode.
-- **Exclusions:** Automatically ignores build output and noisy directories (`node_modules/`, `dist/`, `build/`, `.git/`, `coverage/`) as well as test files (unless explicitly requested via tool arguments).
-- **Project Structure:** Seamlessly supports Next.js, React, Vue, Express, and standard TypeScript/JavaScript workspaces, automatically resolving paths based on `tsconfig.json` `paths` and `baseUrl`.
+MCP Scout provides two specialized parser engines designed to optimize speed and polyglot flexibility.
+
+### 🔍 Detailed Parser Selection Guide
+
+| Parser Mode | Target Languages | Core Advantage | Recommended Use Case |
+| :--- | :--- | :--- | :--- |
+| **`oxc`** (Default) | `.js`, `.jsx`, `.ts`, `.tsx`, `.json` | Blazing-fast Rust parser. Installs immediately with no compiler setup. | Pure web apps, React/Vue frontends, Node.js backends. |
+| **`tree-sitter`** | `.js/.ts` (via OXC) + `.py`, `.go`, `.rs`, `.rb`, `.java`, `.cpp`, `.cs`, `.php`, etc. | Polyglot support via WASM modules. | Multi-language backends, monorepos, and hybrid environments. |
+
+#### 1. Rust-Powered `oxc` Parser (Default)
+- **Best for:** Pure JavaScript/TypeScript codebases, Next.js, Node.js, and general web applications.
+- **Under the hood:** Utilizes the cutting-edge, Rust-compiled `oxc-parser`.
+- **Key Benefit:** Process files in microseconds with virtually zero memory overhead. Installs instantly without compile errors on macOS, Windows, or Linux.
+
+#### 2. Polyglot `tree-sitter` Parser (Optional)
+- **Best for:** Monorepos or backend services spanning multiple languages (e.g. React frontend + Python FastAPI / Go backend).
+- **Supported Languages:** Python (`.py`), Go (`.go`), Dart (`.dart`), Rust (`.rs`), Ruby (`.rb`), Java (`.java`), C/C++ (`.c`, `.cpp`, `.h`, `.hpp`), C# (`.cs`), and PHP (`.php`).
+- **Hybrid Speed Optimization:** Even when set to `tree-sitter` mode, MCP Scout still routes all `.js/.jsx/.ts/.tsx` files through `oxc-parser` to guarantee maximum performance, utilizing WebAssembly-based tree-sitter strictly for other languages.
+
+*Exclusions:* Automatically ignores build output and noisy directories (`node_modules/`, `dist/`, `build/`, `.git/`, `coverage/`) as well as test files (unless explicitly requested via tool arguments).
 
 ---
 
 ## 🏗️ Architecture & Structure
 
-The architecture has evolved into a multi-pipeline engine handling diverse context-gathering tasks:
+The architecture has evolved into a highly modular, decoupled multi-pipeline engine designed according to strict SOLID principles:
 
 ```mermaid
 graph TD
@@ -40,12 +55,13 @@ graph TD
     subgraph MCP Scout Server
         MCPClient --> Tools
         
-        subgraph Tools ["Exposed MCP Tools"]
+        subgraph Tools ["Exposed MCP Tools Boundaries (src/tools/)"]
             FindCode["find_code"]
             TraceSymbol["trace_symbol"]
             GetContext["get_file_context"]
             FindFiles["find_files"]
             ExplainPack["explain_context_pack"]
+            RefreshMap["refresh_map"]
         end
         
         Tools --> Indexer{"Map Cached?"}
@@ -56,7 +72,7 @@ graph TD
         
         Filter --> Pipelines
         
-        subgraph Pipelines ["Context Pipelines"]
+        subgraph Pipelines ["Context Pipelines (src/pipeline/)"]
             SearchPipe["LLM Search & Ranking"]
             DepsPipe["AST Import Graph Resolution"]
             FilePipe["Line-Range Extractor"]
@@ -67,6 +83,14 @@ graph TD
     
     Formatter --> AIResponse["AI Consumes Optimized Context"]
 ```
+
+### 📂 Directory Structure & Code Quality
+Our codebase adheres to rigorous standards (no function exceeding 20 lines, zero use of `any`, and clean SRP boundaries):
+- **`src/index.ts`**: The ultra-lean server bootstrapper (<50 lines). Loads configuration, instantiates the server, and sets up transport.
+- **`src/tools/`**: Dedicated tool boundary layer. Every tool registration (e.g. `findCodeTool.ts`, `traceSymbolTool.ts`) is fully isolated in its own file to maintain modularity.
+- **`src/shared/`**: Decoupled shared domain objects, utilities, types, and error managers (e.g. `src/shared/fs/resolveWorkspaceRoot.ts`, `src/shared/errors/errorMessage.ts`).
+- **`src/indexing/`**: Core parsing engines (`oxc-walker.ts`, `tree-sitter-walker.ts`) and path resolvers that handle module mapping and TSConfig `paths`.
+- **`src/pipeline/`**: The orchestration layers that pipeline complex workflows into clean markdown responses.
 
 ---
 
