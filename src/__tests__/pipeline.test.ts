@@ -45,7 +45,7 @@ describe('runFindCodePipeline with Custom Search', () => {
   })
 
   test('rejects path-traversal globs at parse time', async () => {
-    const { parseCustomQuery } = await import('../pipeline.js')
+    const { parseCustomQuery } = await import('../extraction/custom-search/searcher.js')
     expect(parseCustomQuery('"foo" in ../../**/*.ts')).toBeNull()
     expect(parseCustomQuery('"foo" in /etc/*')).toBeNull()
     expect(parseCustomQuery('"foo" in ~/secrets/*')).toBeNull()
@@ -54,7 +54,7 @@ describe('runFindCodePipeline with Custom Search', () => {
   })
 
   test('rejects overly long patterns at parse time', async () => {
-    const { parseCustomQuery } = await import('../pipeline.js')
+    const { parseCustomQuery } = await import('../extraction/custom-search/searcher.js')
     const longPattern = 'a'.repeat(201)
     expect(parseCustomQuery(`"${longPattern}" in src/**/*.ts`)).toBeNull()
   })
