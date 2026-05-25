@@ -8,6 +8,26 @@ A blazing fast, ultra-lightweight **Model Context Protocol (MCP)** server for **
 
 ---
 
+## 🗺️ Quick Navigation Map
+
+Click on any section below to jump directly to it:
+
+| Section | Description |
+| :--- | :--- |
+| [⚡ Performance & Speed](#performance--why-its-fast) | Why MCP Scout is blazing fast and token-efficient. |
+| [📂 Supported Languages](#supported-file-types--parser-engines) | Detailed guide on supported languages and parser selection (`oxc` vs `tree-sitter`). |
+| [🏗️ Architecture & Structure](#architecture--structure) | Visual architecture pipeline, directory layout, and codebase design standards. |
+| [📦 Requirements & Installation](#requirements--installation) | System requirements, global/local install, and quick run commands. |
+| [⚙️ Configuration](#configuration) | Customizing environment variables via local `.env` files and CLI flags. |
+| [🖥️ Client Integration](#client-integration) | Simplified setup for Claude Desktop, Cursor, Windsurf, Trae, and Claude Code. |
+| [🛠️ Exposed MCP Tools](#exposed-tools) | Complete reference for tools like `find_code`, `trace_symbol`, `get_file_context`, etc. |
+| [🤖 Directives for AI Agents](#critical-system-directives-for-ai-agents-llms) | Critical protocol rules and fallback sequences for LLMs and AI Agents. |
+| [🧪 Development & Testing](#development--testing) | Instructions for contributing, JSON-RPC smoke testing, and using the MCP Inspector. |
+| [📄 License](#license) | Licensing details (MIT). |
+
+---
+
+
 ## ⚡ Performance & Why It's Fast
 
 Traditional codebase analysis tools force LLMs to traverse directories, read raw files, and manually resolve references. This wastes thousands of tokens, causes context overflow, and is extremely slow. 
