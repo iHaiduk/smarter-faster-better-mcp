@@ -28,6 +28,8 @@ Click on any section below to jump directly to it:
 ---
 
 
+<a id="performance-why-its-fast"></a>
+
 ## ⚡ Performance & Why It's Fast
 
 Traditional codebase analysis tools force LLMs to traverse directories, read raw files, and manually resolve references. This wastes thousands of tokens, causes context overflow, and is extremely slow. 
@@ -38,6 +40,8 @@ Traditional codebase analysis tools force LLMs to traverse directories, read raw
 3. **LLM Chunk Parallelism**: Chunks the compact symbol map and distributes requests in parallel. This enables inexpensive, local, and low-latency LLMs to categorize symbols accurately without context limits.
 4. **AST Extraction & Code Collapsing**: Extracts precise function and class bodies directly via AST parsing. The `summaryOnly` mode collapses bodies into stubs, retaining context while saving up to 90% of tokens.
 5. **AST + Regex Dependency Mapping**: Automatically traces exact dependency imports through AST analysis and crawls the workspace using `ripgrep` (`rg`) for rapid fallback symbol mapping.
+
+<a id="supported-file-types-parser-engines"></a>
 
 ## 📂 Supported File Types & Parser Engines
 
@@ -63,6 +67,8 @@ MCP Scout provides two specialized parser engines designed to optimize speed and
 *Exclusions:* Automatically ignores build output and noisy directories (`node_modules/`, `dist/`, `build/`, `.git/`, `coverage/`) as well as test files (unless explicitly requested via tool arguments).
 
 ---
+
+<a id="architecture-structure"></a>
 
 ## 🏗️ Architecture & Structure
 
@@ -114,6 +120,8 @@ Our codebase adheres to rigorous standards (no function exceeding 20 lines, zero
 
 ---
 
+<a id="requirements-installation"></a>
+
 ## 📦 Requirements & Installation
 
 ### Requirements
@@ -140,6 +148,8 @@ bun add smarter-faster-better-mcp
 ```
 
 ---
+
+<a id="configuration"></a>
 
 ## ⚙️ Configuration
 
@@ -177,6 +187,8 @@ npx smarter-faster-better-mcp --parser tree-sitter
 ```
 
 ---
+
+<a id="client-integration"></a>
 
 ## 🖥️ Client Integration
 
@@ -225,6 +237,8 @@ claude mcp add scout npx smarter-faster-better-mcp
 
 ---
 
+<a id="exposed-tools"></a>
+
 ## 🛠️ Exposed Tools
 
 The MCP server exposes a rich set of tools to power the AI context engine:
@@ -255,6 +269,8 @@ Forces a complete rebuild of the project AST symbol map and import graph. Use wh
 
 ---
 
+<a id="critical-system-directives-for-ai-agents-llms"></a>
+
 ## 🤖 CRITICAL SYSTEM DIRECTIVES FOR AI AGENTS (LLMs)
 
 If you are an **AI Agent**, **Claude**, **GPT**, or another **LLM client** running inside an IDE or shell environment, you must adhere strictly to the rules below.
@@ -275,6 +291,8 @@ When the user submits a request, query, or command, execute the following workfl
 4. **Trace and Drill Down**: Use `trace_symbol` to understand relationships, and `get_file_context` to read raw lines if needed.
 
 ---
+
+<a id="development-testing"></a>
 
 ## 🧪 Development & Testing
 
@@ -299,6 +317,8 @@ To debug using the official browser-based MCP inspector:
 ```bash
 npx @modelcontextprotocol/inspector node dist/index.js
 ```
+
+<a id="license"></a>
 
 ## 📄 License
 This project is licensed under the MIT License - see the LICENSE file for details.
