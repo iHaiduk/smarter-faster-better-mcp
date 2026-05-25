@@ -1,4 +1,5 @@
 import * as path from 'node:path'
+import dotenv from 'dotenv'
 
 import type { ParserMode, ProjectMap, ScoutConfig } from '../types.js'
 import { MissingConfigError, InvalidParserModeError } from '../shared/errors/config-errors.js'
@@ -7,6 +8,9 @@ export { MissingConfigError, InvalidParserModeError } from '../shared/errors/con
 export { STOP_WORDS } from '../shared/prompts/stop-words.js'
 export { SYSTEM_PROMPT } from '../shared/prompts/system-prompt.js'
 export { getSourceExtensions } from '../shared/constants/extensions.js'
+
+// Auto-run dotenv loading from process.cwd() upon module import
+dotenv.config()
 
 export const getMapFilePath = (targetRoot: string): string => path.join(targetRoot, '.project_map.json')
 export const getCacheDir = (targetRoot: string): string => path.join(targetRoot, '.scout-cache')

@@ -1,6 +1,6 @@
 {
   "name": "smarter-faster-better-mcp",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "Blazing fast AST-based MCP code search using OXC with optional Tree-sitter polyglot parsing",
   "keywords": [
     "mcp",
@@ -44,6 +44,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@repomix/tree-sitter-wasms": "^0.1.17",
+    "dotenv": "^17.4.2",
     "oxc-parser": "^0.132.0",
     "web-tree-sitter": "^0.26.9",
     "zod": "^4.4.3"

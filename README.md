@@ -125,6 +125,21 @@ bun add smarter-faster-better-mcp
 
 The server expects configuration parameters via environment variables.
 
+### 🌟 Recommended Setup (.env file)
+Starting with version `0.4.0`, **MCP Scout** automatically loads configuration from a `.env` file located in the current working directory (`process.cwd()`) where the server is launched (i.e. your active project directory). This allows you and your team to configure their own LLM preferences without hardcoding them into client configs or committing them to git.
+
+Simply create a `.env` file in the root of your project:
+```env
+SCOUT_BASE_URL=http://localhost:11434/v1
+SCOUT_API_KEY=ollama
+SCOUT_MODEL=llama3.1:8b
+SCOUT_LLM_PARALLELISM=2
+```
+
+Add `.env` to your `.gitignore` to keep configurations private.
+
+### Available Variables
+
 | Variable | Description | Default | Required |
 | :--- | :--- | :--- | :--- |
 | `SCOUT_BASE_URL` | Endpoint of your LLM provider (e.g. Ollama, OpenAI) | - | **Yes** |
@@ -145,7 +160,7 @@ npx smarter-faster-better-mcp --parser tree-sitter
 
 ## 🖥️ Client Integration
 
-Configure your favorite AI IDE or client to load the MCP server.
+Since the server automatically reads from the active project's local `.env` file, the configuration in your AI IDE becomes incredibly simple and lightweight!
 
 ### Claude Desktop
 
@@ -156,45 +171,26 @@ Add the following to your configuration file (usually at `~/Library/Application 
   "mcpServers": {
     "scout": {
       "command": "npx",
-      "args": ["smarter-faster-better-mcp"],
-      "env": {
-        "SCOUT_BASE_URL": "http://localhost:11434/v1",
-        "SCOUT_API_KEY": "ollama",
-        "SCOUT_MODEL": "llama3.1:8b",
-        "SCOUT_LLM_PARALLELISM": "2"
-      }
+      "args": ["smarter-faster-better-mcp"]
     }
   }
 }
 ```
 
-### Cursor / Windsurf / Trae (Robust Cross-Client Configuration)
+### Cursor / Windsurf / Trae (Highly Simplified Setup)
 
-If your client has issues parsing the standard `env` block (which causes the MCP process to instantly crash on startup), you can wrap the execution using the system `env` command directly:
+Since no environment variables are needed in the IDE setup itself, you can easily add this as a standard Command MCP Server in your IDE settings:
 
 *   **Name**: `scout`
 *   **Type**: `command`
-*   **Command**: `env`
-*   **Arguments**:
-    ```text
-    SCOUT_BASE_URL=http://127.0.0.1:1234/v1
-    SCOUT_API_KEY=lm-studio
-    SCOUT_MODEL=openai/gpt-oss-20b
-    SCOUT_LLM_PARALLELISM=2
-    npx
-    smarter-faster-better-mcp
-    ```
+*   **Command**: `npx`
+*   **Arguments**: `smarter-faster-better-mcp`
 
-Or in JSON format (e.g. `.mcp.json` or `.code-review-graph` configs):
+Or in JSON format:
 ```json
 "scout": {
-  "command": "env",
+  "command": "npx",
   "args": [
-    "SCOUT_BASE_URL=http://127.0.0.1:1234/v1",
-    "SCOUT_API_KEY=lm-studio",
-    "SCOUT_MODEL=openai/gpt-oss-20b",
-    "SCOUT_LLM_PARALLELISM=2",
-    "npx",
     "smarter-faster-better-mcp"
   ]
 }
@@ -202,13 +198,9 @@ Or in JSON format (e.g. `.mcp.json` or `.code-review-graph` configs):
 
 ### Claude Code
 
-Add the server to Claude Code with inline environment variables by executing:
+Simply add the server with one command:
 ```bash
-claude mcp add scout npx smarter-faster-better-mcp \
-  -e SCOUT_BASE_URL=http://127.0.0.1:1234/v1 \
-  -e SCOUT_API_KEY=lm-studio \
-  -e SCOUT_MODEL=openai/gpt-oss-20b \
-  -e SCOUT_LLM_PARALLELISM=2
+claude mcp add scout npx smarter-faster-better-mcp
 ```
 
 ---
