@@ -23,6 +23,7 @@ describe('shouldIgnorePath Filtering Rules', () => {
   })
 
   test('excludes compilation/build/temporary/cache/history directories', () => {
+    expect(shouldIgnorePath('node_modules/lodash/index.js')).toBe(true)
     expect(shouldIgnorePath('dist/index.js')).toBe(true)
     expect(shouldIgnorePath('build/App.js')).toBe(true)
     expect(shouldIgnorePath('cache/meta.json')).toBe(true)

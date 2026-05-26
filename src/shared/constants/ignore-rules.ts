@@ -1,5 +1,8 @@
 /** Directories that are always excluded from scanning and searching. */
 export const IGNORED_DIRS = [
+  // 1. Dependency Directories
+  'node_modules',
+
   // 2. Build & Compilation Artifacts (Compiled/built files)
   'dist',
   'build',
@@ -80,4 +83,3 @@ export function shouldIgnorePath(rel: string): boolean {
 export function ignoreFindArgs(): string[] {
   return IGNORED_DIRS.flatMap((d) => ['-not', '-path', `*/${d}/*`])
 }
-
