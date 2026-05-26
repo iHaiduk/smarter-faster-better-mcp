@@ -1,0 +1,303 @@
+{
+  "name": "ExpoModulesCore",
+  "version": "1.8.0",
+  "summary": "Core library for Expo modules and swift adapters",
+  "description": "ExpoModulesCore provides the essential APIs, protocols and adapters required to build Swift/Kotlin modules for the Expo ecosystem.",
+  "homepage": "https://github.com/expo/expo/tree/main/packages/expo-modules-core",
+  "license": "MIT",
+  "authors": {
+    "Expo": "expo@expo.dev"
+  },
+  "source": {
+    "git": "https://github.com/expo/expo.git",
+    "tag": "v1.8.0"
+  },
+  "platforms": {
+    "ios": "13.0"
+  },
+  "source_files": "ios/**/*.{h,m,swift}",
+  "public_header_files": "ios/**/*.h",
+  "exclude_files": "ios/Tests/**/*",
+  "dependencies": {
+    "React-Core": [],
+    "React-bridging": []
+  },
+  "pod_target_xcconfig": {
+    "DEFINES_MODULE": "YES",
+    "SWIFT_COMPILER_FLAGS": "-no-warnings"
+  },
+  "subspecs": [
+    {
+      "name": "Protocols",
+      "source_files": "ios/Protocols/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Common": []
+      }
+    },
+    {
+      "name": "Common",
+      "source_files": "ios/Common/**/*.{h,m,swift}"
+    },
+    {
+      "name": "Legacy",
+      "source_files": "ios/Legacy/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Protocols": []
+      }
+    },
+    {
+      "name": "Swift",
+      "source_files": "ios/Swift/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Protocols": []
+      }
+    },
+    {
+      "name": "Arguments",
+      "source_files": "ios/Arguments/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Controllers",
+      "source_files": "ios/Controllers/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Events",
+      "source_files": "ios/Events/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "ModuleRegistry",
+      "source_files": "ios/ModuleRegistry/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "ViewDefinition",
+      "source_files": "ios/ViewDefinition/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "AppContext",
+      "source_files": "ios/AppContext/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "AppDelegate",
+      "source_files": "ios/AppDelegate/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "ReactDelegate",
+      "source_files": "ios/ReactDelegate/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "DynamicTypes",
+      "source_files": "ios/DynamicTypes/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "JSI",
+      "source_files": "ios/JSI/**/*.{h,m,mm,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": [],
+        "React-jsi": []
+      }
+    },
+    {
+      "name": "NativeModulesProxy",
+      "source_files": "ios/NativeModulesProxy/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Views",
+      "source_files": "ios/Views/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Utilities",
+      "source_files": "ios/Utilities/**/*.{h,m,swift}"
+    },
+    {
+      "name": "Errors",
+      "source_files": "ios/Errors/**/*.{h,m,swift}"
+    },
+    {
+      "name": "Mock",
+      "source_files": "ios/Mock/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "SharedObjects",
+      "source_files": "ios/SharedObjects/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Reflect",
+      "source_files": "ios/Reflect/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Core",
+      "source_files": "ios/Core/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Tracing",
+      "source_files": "ios/Tracing/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Promises",
+      "source_files": "ios/Promises/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Logging",
+      "source_files": "ios/Logging/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Performance",
+      "source_files": "ios/Performance/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Telemetry",
+      "source_files": "ios/Telemetry/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Compatibility",
+      "source_files": "ios/Compatibility/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Tests",
+      "source_files": "ios/Tests/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Debugging",
+      "source_files": "ios/Debugging/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Profiling",
+      "source_files": "ios/Profiling/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Internal",
+      "source_files": "ios/Internal/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Metadata",
+      "source_files": "ios/Metadata/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Diagnostics",
+      "source_files": "ios/Diagnostics/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Analytics",
+      "source_files": "ios/Analytics/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Instrumentation",
+      "source_files": "ios/Instrumentation/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Bridge",
+      "source_files": "ios/Bridge/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Adapter",
+      "source_files": "ios/Adapter/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Compiler",
+      "source_files": "ios/Compiler/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    },
+    {
+      "name": "Runtime",
+      "source_files": "ios/Runtime/**/*.{h,m,swift}",
+      "dependencies": {
+        "ExpoModulesCore/Swift": []
+      }
+    }
+  ]
+}

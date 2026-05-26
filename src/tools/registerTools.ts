@@ -7,6 +7,7 @@ import { registerGetFileContextTool } from './getFileContextTool.js'
 import { registerFindFilesTool } from './findFilesTool.js'
 import { registerExplainContextPackTool } from './explainContextPackTool.js'
 import { registerRefreshMapTool } from './refreshMapTool.js'
+import { registerCleanupTool } from './cleanupTool.js'
 
 export function registerAllTools(server: McpServer, config: ScoutConfig): void {
   registerFindCodeTool(server, config)
@@ -15,4 +16,5 @@ export function registerAllTools(server: McpServer, config: ScoutConfig): void {
   registerFindFilesTool(server)
   registerExplainContextPackTool(server, config)
   registerRefreshMapTool(server)
+  registerCleanupTool(server)
 }

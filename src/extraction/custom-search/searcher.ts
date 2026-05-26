@@ -7,6 +7,7 @@ import { formatFound, toStructuredJSON } from '../../format.js'
 import { getProjectFiles } from '../../indexing/symbol-map/build-map.js'
 import { readMap } from '../../cache/map-cache.js'
 import { resolveBudget } from '../../shared/constants/budget.js'
+import { shouldIgnorePath } from '../../shared/constants/ignore-rules.js'
 
 import type { ContextBudgetOptions, ExtractedSymbol, LLMCandidate, ProjectMap } from '../../types.js'
 
@@ -139,14 +140,7 @@ export async function runCustomSearch(
       skipped++
       continue
     }
-    if (
-      file.includes('node_modules/') ||
-      file.startsWith('.git/') ||
-      file.includes('/.git/') ||
-      file.includes('.scout-cache/') ||
-      file.includes('dist/') ||
-      file.includes('build/')
-    ) {
+    if (shouldIgnorePath(file)) {
       continue
     }
     if (looksBinary(file)) continue

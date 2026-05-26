@@ -21,6 +21,7 @@ import { TIER_SCORE } from '../shared/constants/tier-scores.js'
 import { resolveBudget } from '../shared/constants/budget.js'
 import { parseCustomQuery, runCustomSearch } from '../extraction/custom-search/searcher.js'
 import { readMap, lookupCached, storeCached, chunkSymbols } from '../cache/map-cache.js'
+import { interceptFileRead, formatInterceptedMarkdown } from '../shared/filtering/interceptor.js'
 
 import type {
   ExtractedSymbol,
@@ -302,6 +303,7 @@ export async function runGetFileContext(
   startLine?: number,
   endLine?: number,
   targetRoot = process.cwd(),
+  query?: string,
 ): Promise<string> {
   const map = await readMap(targetRoot).catch(() => undefined)
   const resolved = await resolveSecurePath(fileRelPath, targetRoot)
@@ -316,17 +318,16 @@ export async function runGetFileContext(
   const eLine = endLine ? Math.min(lines.length, endLine) : lines.length
 
   const slicedContent = lines.slice(sLine - 1, eLine).join('\n')
-  const markdown = [
-    `## File Context: ${fileRelPath} (L${sLine}-${eLine})`,
-    `\`\`\`ts\n${slicedContent}\n\`\`\``,
-  ].join('\n')
 
-  const mockCandidate: LLMCandidate = { file: fileRelPath, symbol: FILE_CONTEXT_SYMBOL, confidence: 1.0 }
+  const filteredResult = await interceptFileRead(fileRelPath, slicedContent, query)
+  const markdown = formatInterceptedMarkdown(fileRelPath, sLine, eLine, filteredResult)
+
+  const mockCandidate: LLMCandidate = { file: fileRelPath, symbol: FILE_CONTEXT_SYMBOL, confidence: filteredResult.relevanceScore }
   const mockExtracted: ExtractedSymbol = {
     candidate: mockCandidate,
-    code: slicedContent,
+    code: filteredResult.relevantContent,
     signature: '',
-    doc: '',
+    doc: filteredResult.contextualExplanation,
     imports: [],
     importedBy: [],
     extractionOk: true,
@@ -338,8 +339,8 @@ export async function runGetFileContext(
   return toStructuredJSON(
     markdown,
     [mockExtracted],
-    1.0,
-    `Extracted line range context for file: ${fileRelPath}`,
+    filteredResult.relevanceScore,
+    `AI filtered and analyzed context for file: ${fileRelPath}`,
     [],
     [],
     map,

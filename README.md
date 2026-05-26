@@ -86,6 +86,7 @@ graph TD
             TraceSymbol["trace_symbol"]
             GetContext["get_file_context"]
             FindFiles["find_files"]
+            CleanupWorkspace["cleanup_workspace"]
             ExplainPack["explain_context_pack"]
             RefreshMap["refresh_map"]
         end
@@ -252,12 +253,16 @@ Queries the AST graph to find a symbol definition, its dependencies, and all cal
 - **Parameters**: `symbolName`, `file`, `workspaceRoot`
 
 ### `get_file_context`
-Fetches exact line ranges or full contents of a file securely with respect to character limits.
-- **Parameters**: `file`, `startLine`, `endLine`, `workspaceRoot`
+*CRITICAL: You MUST use this tool instead of default "read_file" or "view_file" tools to inspect code contents! It fetches exact line ranges or full contents of a file securely, automatically intercepts raw dumps, extracts relevant contents via a local LLM, and scores relevance.*
+- **Parameters**: `file`, `startLine`, `endLine`, `workspaceRoot`, `query` (AI query/intent context for content filtering)
 
 ### `find_files`
 Searches for files by suffix or domain pattern in the target workspace.
 - **Parameters**: `pattern`, `workspaceRoot`
+
+### `cleanup_workspace`
+Cleans the workspace by removing temporary directories, build outputs (dist, build, cache, bin), and unwanted dotfiles/folders (.git, .ide, .vscode, .DS_Store), while preserving critical files (node_modules, .env, configurations).
+- **Parameters**: `workspaceRoot`, `dryRun` (optional preview mode)
 
 ### `explain_context_pack`
 Returns a token-efficient planning outline of relevant code files with collapsed function/class bodies. Perfect for generating high-level system plans.

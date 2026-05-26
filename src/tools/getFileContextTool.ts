@@ -14,13 +14,14 @@ const SCHEMA = {
   startLine: z.number().optional().describe('1-based start line number (inclusive)'),
   endLine: z.number().optional().describe('1-based end line number (inclusive)'),
   workspaceRoot: z.string().optional().describe('Target workspace root'),
+  query: z.string().optional().describe('AI query or intent context to filter content and compute relevance'),
 }
 
 export function registerGetFileContextTool(server: McpServer): void {
   server.tool('get_file_context', DESCRIPTION, SCHEMA, async (args) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
-      const text = await runGetFileContext(args.file, args.startLine, args.endLine, root)
+      const text = await runGetFileContext(args.file, args.startLine, args.endLine, root, args.query)
       return { content: [{ type: 'text', text }] }
     } catch (err) {
       const errorMsg = errorMessage(err)
