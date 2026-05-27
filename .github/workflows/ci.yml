@@ -28,5 +28,8 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify packed entrypoint
+        run: npm run verify:pack
+
       - name: Test
         run: bun test

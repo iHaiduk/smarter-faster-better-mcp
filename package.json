@@ -1,6 +1,6 @@
 {
   "name": "smarter-faster-better-mcp",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "Blazing fast AST-based MCP code search using OXC with optional Tree-sitter polyglot parsing",
   "keywords": [
     "mcp",
@@ -37,9 +37,11 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "prepack": "npm run check && npm run build",
+    "prepublishOnly": "npm run check && npm run build && npm run verify:pack",
     "scout": "bun run src/bin/test-scout.ts cache",
     "scout:summary": "bun run src/bin/test-scout.ts cache --summary",
-    "test": "bun test"
+    "test": "bun test",
+    "verify:pack": "node ./scripts/verify-packed-entry.mjs"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",

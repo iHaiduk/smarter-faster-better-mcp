@@ -12,7 +12,7 @@ import { registerAllTools } from './tools/registerTools.js'
 import { cleanupWorkspace } from './shared/fs/cleanup.js'
 
 const requireUtil = createRequire(import.meta.url)
-const PACKAGE_JSON_PATH = '../../package.json'
+const PACKAGE_JSON_PATH = '../package.json'
 const { version: SCOUT_VERSION } = requireUtil(PACKAGE_JSON_PATH) as { version: string }
 const SERVER_NAME = 'mcp-scout'
 

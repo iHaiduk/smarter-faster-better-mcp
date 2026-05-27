@@ -6,6 +6,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.5.2] - 2026-05-27
+
+### Fixed
+- Corrected the packaged MCP entrypoint so `bunx smarter-faster-better-mcp` resolves the bundled `package.json` from the published package root instead of walking outside the package.
+
+### Added
+- Added a packed-entry verification step that imports the tarballed `dist/index.js` before publish, preventing broken npm releases caused by stale or misbuilt artifacts.
+
+---
+
 ## [0.4.0] - 2026-05-25
 
 ### Added
