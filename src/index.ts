@@ -9,7 +9,6 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import { loadConfig, MissingConfigError } from './config.js'
 import { registerAllTools } from './tools/registerTools.js'
-import { cleanupWorkspace } from './shared/fs/cleanup.js'
 
 const requireUtil = createRequire(import.meta.url)
 const PACKAGE_JSON_PATH = '../package.json'
@@ -36,17 +35,6 @@ async function initializeServer(): Promise<void> {
   const transport = new StdioServerTransport()
   await mcpServer.connect(transport)
   console.error('[Scout] Server running on stdio')
-
-  // Run automatic workspace cleanup asynchronously in the background
-  cleanupWorkspace(process.cwd())
-    .then((result) => {
-      if (result.deleted.length > 0) {
-        console.error(`[Scout] Automatic workspace cleanup finished. Removed ${result.deleted.length} paths.`);
-      }
-    })
-    .catch((err) => {
-      console.error('[Scout] Automatic workspace cleanup failed:', err);
-    });
 }
 
 async function main(): Promise<void> {

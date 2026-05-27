@@ -42,7 +42,7 @@ describe('shouldIgnorePath Filtering Rules', () => {
   })
 })
 
-describe('cleanupWorkspace Functionality', () => {
+describe('cleanupWorkspace Functionality (Strict Safe Cleanup)', () => {
   const testWorkspaceRoot = path.join(import.meta.dir, 'temp_cleanup_test_dir')
 
   beforeAll(async () => {
@@ -52,27 +52,21 @@ describe('cleanupWorkspace Functionality', () => {
 
     // Create a mock workspace directory structure
     await fs.mkdir(path.join(testWorkspaceRoot, 'node_modules'), { recursive: true })
-    await fs.mkdir(path.join(testWorkspaceRoot, 'bower_components'), { recursive: true })
     await fs.mkdir(path.join(testWorkspaceRoot, 'src'), { recursive: true })
     await fs.mkdir(path.join(testWorkspaceRoot, 'dist'), { recursive: true })
     await fs.mkdir(path.join(testWorkspaceRoot, '.git'), { recursive: true })
     await fs.mkdir(path.join(testWorkspaceRoot, '.vscode'), { recursive: true })
-    await fs.mkdir(path.join(testWorkspaceRoot, 'cache'), { recursive: true })
+    await fs.mkdir(path.join(testWorkspaceRoot, '.scout-cache'), { recursive: true })
 
     // Create files inside directories
-    await fs.writeFile(path.join(testWorkspaceRoot, 'node_modules', 'some-pkg.js'), 'pkg code')
-    await fs.writeFile(path.join(testWorkspaceRoot, 'bower_components', 'component.js'), 'comp code')
     await fs.writeFile(path.join(testWorkspaceRoot, 'src', 'index.ts'), 'export const main = () => {}')
     await fs.writeFile(path.join(testWorkspaceRoot, 'dist', 'bundle.js'), 'bundle code')
-    await fs.writeFile(path.join(testWorkspaceRoot, '.git', 'HEAD'), 'ref: refs/heads/main')
     await fs.writeFile(path.join(testWorkspaceRoot, '.vscode', 'settings.json'), '{}')
-    await fs.writeFile(path.join(testWorkspaceRoot, 'cache', 'data.json'), '{}')
+    await fs.writeFile(path.join(testWorkspaceRoot, '.scout-cache', 'cache-file.json'), '{}')
 
     // Create root level files
     await fs.writeFile(path.join(testWorkspaceRoot, '.env'), 'PORT=3000')
-    await fs.writeFile(path.join(testWorkspaceRoot, '.gitignore'), 'node_modules')
-    await fs.writeFile(path.join(testWorkspaceRoot, 'tsconfig.json'), '{}')
-    await fs.writeFile(path.join(testWorkspaceRoot, '.DS_Store'), 'junk data')
+    await fs.writeFile(path.join(testWorkspaceRoot, '.project_map.json'), '{}')
     await fs.writeFile(path.join(testWorkspaceRoot, 'main.ts'), 'console.log("hello")')
   })
 
@@ -81,65 +75,52 @@ describe('cleanupWorkspace Functionality', () => {
     await fs.rm(testWorkspaceRoot, { recursive: true, force: true }).catch(() => {})
   })
 
-  test('correctly lists paths for dryRun without deleting anything', async () => {
+  test('correctly lists only own cache paths for dryRun without deleting anything', async () => {
     const result = await cleanupWorkspace(testWorkspaceRoot, { dryRun: true })
 
-    // Verify correct items identified as deleted/preserved
-    expect(result.deleted).toContain('dist')
-    expect(result.deleted).toContain('.vscode')
-    expect(result.deleted).toContain('cache')
-    expect(result.deleted).toContain('.DS_Store')
-
-    expect(result.preserved).toContain('.git')
-    expect(result.preserved).toContain('node_modules')
-    expect(result.preserved).toContain('bower_components')
-    expect(result.preserved).toContain('src')
-    expect(result.preserved).toContain('.env')
-    expect(result.preserved).toContain('.gitignore')
-    expect(result.preserved).toContain('tsconfig.json')
-    expect(result.preserved).toContain('main.ts')
+    // Only .scout-cache and .project_map.json should be identified as deleted
+    expect(result.deleted).toContain('.scout-cache')
+    expect(result.deleted).toContain('.project_map.json')
+    expect(result.deleted.length).toBe(2)
 
     // Verify files still exist on disk
-    expect(await fs.stat(path.join(testWorkspaceRoot, 'dist')).then((s) => s.isDirectory())).toBe(true)
-    expect(await fs.stat(path.join(testWorkspaceRoot, '.git')).then((s) => s.isDirectory())).toBe(true)
-    expect(await fs.stat(path.join(testWorkspaceRoot, '.DS_Store')).then((s) => s.isFile())).toBe(true)
-  })
-
-  test('correctly deletes unwanted folders/files and preserves critical ones on actual run', async () => {
-    const result = await cleanupWorkspace(testWorkspaceRoot, { dryRun: false })
-
-    expect(result.deleted).toContain('dist')
-    expect(result.deleted).toContain('.vscode')
-    expect(result.deleted).toContain('cache')
-    expect(result.deleted).toContain('.DS_Store')
-
-    expect(result.preserved).toContain('.git')
-
-    // Verify deleted items are actually gone
     const checkExists = async (p: string) =>
       fs
         .stat(p)
         .then(() => true)
         .catch(() => false)
 
-    expect(await checkExists(path.join(testWorkspaceRoot, 'dist'))).toBe(false)
+    expect(await checkExists(path.join(testWorkspaceRoot, '.scout-cache'))).toBe(true)
+    expect(await checkExists(path.join(testWorkspaceRoot, '.project_map.json'))).toBe(true)
+    expect(await checkExists(path.join(testWorkspaceRoot, 'dist'))).toBe(true)
     expect(await checkExists(path.join(testWorkspaceRoot, '.git'))).toBe(true)
-    expect(await checkExists(path.join(testWorkspaceRoot, '.vscode'))).toBe(false)
-    expect(await checkExists(path.join(testWorkspaceRoot, 'cache'))).toBe(false)
-    expect(await checkExists(path.join(testWorkspaceRoot, '.DS_Store'))).toBe(false)
+    expect(await checkExists(path.join(testWorkspaceRoot, '.vscode'))).toBe(true)
+  })
 
-    // Verify preserved items are still present
+  test('deletes ONLY scout-cache and project_map, while preserving user code, configs, git, and build files', async () => {
+    const result = await cleanupWorkspace(testWorkspaceRoot, { dryRun: false })
+
+    expect(result.deleted).toContain('.scout-cache')
+    expect(result.deleted).toContain('.project_map.json')
+    expect(result.deleted.length).toBe(2)
+
+    const checkExists = async (p: string) =>
+      fs
+        .stat(p)
+        .then(() => true)
+        .catch(() => false)
+
+    // Verify own cache files are deleted
+    expect(await checkExists(path.join(testWorkspaceRoot, '.scout-cache'))).toBe(false)
+    expect(await checkExists(path.join(testWorkspaceRoot, '.project_map.json'))).toBe(false)
+
+    // Verify user files/folders are 100% PRESERVED
+    expect(await checkExists(path.join(testWorkspaceRoot, 'dist'))).toBe(true)
+    expect(await checkExists(path.join(testWorkspaceRoot, '.git'))).toBe(true)
+    expect(await checkExists(path.join(testWorkspaceRoot, '.vscode'))).toBe(true)
     expect(await checkExists(path.join(testWorkspaceRoot, 'node_modules'))).toBe(true)
-    expect(await checkExists(path.join(testWorkspaceRoot, 'bower_components'))).toBe(true)
     expect(await checkExists(path.join(testWorkspaceRoot, 'src'))).toBe(true)
     expect(await checkExists(path.join(testWorkspaceRoot, '.env'))).toBe(true)
-    expect(await checkExists(path.join(testWorkspaceRoot, '.gitignore'))).toBe(true)
-    expect(await checkExists(path.join(testWorkspaceRoot, 'tsconfig.json'))).toBe(true)
     expect(await checkExists(path.join(testWorkspaceRoot, 'main.ts'))).toBe(true)
-
-    // Verify nested node_modules / src files are preserved
-    expect(await checkExists(path.join(testWorkspaceRoot, 'node_modules', 'some-pkg.js'))).toBe(true)
-    expect(await checkExists(path.join(testWorkspaceRoot, 'bower_components', 'component.js'))).toBe(true)
-    expect(await checkExists(path.join(testWorkspaceRoot, 'src', 'index.ts'))).toBe(true)
   })
 })

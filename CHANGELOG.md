@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.5.5] - 2026-05-27
+
+### Changed
+- Refactored `cleanupWorkspace` to be strictly non-destructive for user files: it now ONLY removes Scout's own generated files (`.scout-cache` and `.project_map.json`) during cleanup. It will never touch user build outputs (`dist`, `build`, etc.), configurations, or hidden system folders.
+- Completely removed automatic workspace cleanup from executing in the background on startup to guarantee zero invasive file deletions.
+
 ## [0.5.4] - 2026-05-27
 
 ### Fixed
