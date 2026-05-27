@@ -11,6 +11,7 @@ const CRITICAL_FOLDERS = new Set([
   '.copilot',
   '.cursor',
   '.gemini',
+  '.git',
 ])
 
 const CRITICAL_FILES = new Set([
@@ -50,7 +51,6 @@ const ROOT_CLEANUP_DIRS = new Set([
   'bin',
   'coverage',
   '.scout-cache',
-  '.git',
   '.ide',
   '.vscode',
   '.expo',

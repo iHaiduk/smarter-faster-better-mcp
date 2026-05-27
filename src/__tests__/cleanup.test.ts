@@ -86,11 +86,11 @@ describe('cleanupWorkspace Functionality', () => {
 
     // Verify correct items identified as deleted/preserved
     expect(result.deleted).toContain('dist')
-    expect(result.deleted).toContain('.git')
     expect(result.deleted).toContain('.vscode')
     expect(result.deleted).toContain('cache')
     expect(result.deleted).toContain('.DS_Store')
 
+    expect(result.preserved).toContain('.git')
     expect(result.preserved).toContain('node_modules')
     expect(result.preserved).toContain('bower_components')
     expect(result.preserved).toContain('src')
@@ -109,10 +109,11 @@ describe('cleanupWorkspace Functionality', () => {
     const result = await cleanupWorkspace(testWorkspaceRoot, { dryRun: false })
 
     expect(result.deleted).toContain('dist')
-    expect(result.deleted).toContain('.git')
     expect(result.deleted).toContain('.vscode')
     expect(result.deleted).toContain('cache')
     expect(result.deleted).toContain('.DS_Store')
+
+    expect(result.preserved).toContain('.git')
 
     // Verify deleted items are actually gone
     const checkExists = async (p: string) =>
@@ -122,7 +123,7 @@ describe('cleanupWorkspace Functionality', () => {
         .catch(() => false)
 
     expect(await checkExists(path.join(testWorkspaceRoot, 'dist'))).toBe(false)
-    expect(await checkExists(path.join(testWorkspaceRoot, '.git'))).toBe(false)
+    expect(await checkExists(path.join(testWorkspaceRoot, '.git'))).toBe(true)
     expect(await checkExists(path.join(testWorkspaceRoot, '.vscode'))).toBe(false)
     expect(await checkExists(path.join(testWorkspaceRoot, 'cache'))).toBe(false)
     expect(await checkExists(path.join(testWorkspaceRoot, '.DS_Store'))).toBe(false)

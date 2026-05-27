@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.5.4] - 2026-05-27
+
+### Fixed
+- Suppressed `dotenv` v17's console logging (`◇ injected env...`) by passing `quiet: true`. This prevents non-JSON characters from polluting the standard output (`stdout`), fixing MCP connection crashes under `bunx` / `bun` runtimes.
+- Protected the `.git` directory from being accidentally removed during automatic workspace cleanup by designating it as a critical folder.
+
 ## [0.5.3] - 2026-05-27
 
 ### Fixed
