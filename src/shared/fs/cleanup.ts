@@ -1,5 +1,6 @@
 import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
+import * as os from 'node:os'
 
 /** Essential folders/files that must never be removed during cleanup. */
 const CRITICAL_FOLDERS = new Set([
@@ -83,6 +84,11 @@ export async function cleanupWorkspace(
 
   try {
     const rootRealPath = await fs.realpath(workspaceRoot)
+    const systemHome = os.homedir()
+    if (rootRealPath === systemHome || path.dirname(rootRealPath) === rootRealPath) {
+      console.error(`[Scout Cleanup] Cleanup skipped: ${rootRealPath} is the filesystem root or user home directory.`)
+      return { deleted, preserved }
+    }
     const entries = await fs.readdir(rootRealPath, { withFileTypes: true })
 
     for (const entry of entries) {

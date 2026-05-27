@@ -6,7 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.5.2] - 2026-05-27
+## [0.5.3] - 2026-05-27
+
+### Fixed
+- Prevented automatic workspace cleanup from executing when the resolved directory is the filesystem root (`/`) or the user's home directory. This fixes permission errors and prevents system/dotfile cleanup from crashing the MCP server on startup.
 
 ### Fixed
 - Corrected the packaged MCP entrypoint so `bunx smarter-faster-better-mcp` resolves the bundled `package.json` from the published package root instead of walking outside the package.

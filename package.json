@@ -1,6 +1,6 @@
 {
   "name": "smarter-faster-better-mcp",
-  "version": "0.5.2",
+  "version": "0.5.3",
   "description": "Blazing fast AST-based MCP code search using OXC with optional Tree-sitter polyglot parsing",
   "keywords": [
     "mcp",
