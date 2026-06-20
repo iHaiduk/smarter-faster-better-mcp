@@ -1,10 +1,10 @@
 import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
 
-import { getCacheDir, getParserMode } from '../config.js'
+import { getCacheDir, getParserMode } from '../config/index.js'
 import { hashCacheKey } from '../shared/cache/key.js'
 import { fileExists } from '../shared/utils/node.js'
-import type { ExtractedSymbol } from '../types.js'
+import type { ExtractedSymbol } from '../shared/types/index.js'
 
 function keyFor(file: string, symbol: string, summaryOnly: boolean): string {
   return hashCacheKey({ file, symbol, summaryOnly, parserMode: getParserMode() })

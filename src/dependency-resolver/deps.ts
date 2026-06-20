@@ -1,4 +1,4 @@
-import type { ProjectMap } from '../types.js'
+import type { ProjectMap } from '../shared/types/index.js'
 
 const MAX_DEP_FILES = 5
 

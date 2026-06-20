@@ -3,13 +3,13 @@ import {
   getMapFilePath,
   getParserMode,
   projectMapMatchesParserMode,
-} from '../config.js'
+} from '../config/index.js'
 import { getSourceExtensions } from '../shared/constants/extensions.js'
 import { ignoreFindArgs } from '../shared/constants/ignore-rules.js'
 import { buildCacheKey } from '../shared/cache/key.js'
 import { fileExists, runCommand } from '../shared/utils/node.js'
 
-import type { ExtractedSymbol, ParserMode, ProjectMap } from '../types.js'
+import type { ExtractedSymbol, ParserMode, ProjectMap } from '../shared/types/index.js'
 
 // ─── L1: In-memory Cache ────────────────────────────────────────────────────
 export const l1Cache = new Map<string, ExtractedSymbol>()

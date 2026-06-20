@@ -1,5 +1,6 @@
 import { loadConfig } from '../../config/index.js'
-import { cleanJSON } from '../..//extraction/llm.js'
+import { cleanJSON } from '../utils/json.js'
+import { buildEndpoint } from '../utils/llm-client.js'
 
 const INTERCEPT_SYSTEM_PROMPT = `
 You are a File Content Filtering AI. Your job is to intercept file-reading commands, extract ONLY the specific and highly relevant content needed from the file, and score the relevance.
@@ -18,11 +19,6 @@ export interface FilteredFileResult {
   readonly relevantContent: string
 }
 
-function buildEndpoint(baseUrl: string): URL {
-  const normalized = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
-  return new URL('chat/completions', normalized)
-}
-
 /**
  * Intercepts file reading operations, processes the content via local LLM
  * to perform content filtering, relevance scoring, and contextual explanations.
@@ -37,20 +33,6 @@ export async function interceptFileRead(
     relevanceScore: 1.0,
     contextualExplanation: `Direct file context extracted without active AI filtering due to LLM fallback (Read ${rawContent.split('\n').length} lines of ${file}).`,
     relevantContent: rawContent,
-  }
-
-  // Bypass real network requests during tests to prevent hanging and timeouts
-  if (process.env.NODE_ENV === 'test') {
-    if (file === 'test.ts') {
-      return fallbackResult
-    }
-    if (file.includes('ExpoModulesCore.podspec.json')) {
-      return {
-        relevanceScore: 0.95,
-        contextualExplanation: 'This is a mock explanation for ExpoModulesCore.podspec.json.',
-        relevantContent: `"name": "ExpoModulesCore",\n"version": "1.8.0"`,
-      }
-    }
   }
 
   let config

@@ -1,13 +1,13 @@
 // Refactored: 2026-05-21 — modern JS/TS
-import { loadConfig } from '../config.js'
-import { findDeps } from '../deps.js'
+import { loadConfig } from '../config/index.js'
+import { findDeps } from '../dependency-resolver/deps.js'
 import { buildMap } from '../indexing/symbol-map/build-map.js'
-import { extractWithOxc } from '../extract.js'
-import { filterMap } from '../filter.js'
-import { formatFound } from '../format.js'
+import { extractWithOxc } from '../extraction/extract.js'
+import { filterMap } from '../extraction/matcher/filter.js'
+import { formatFound } from '../bundle/formatter/format.js'
 import { runFindCodePipeline } from '../pipeline/index.js'
 
-import type { ProjectMap, SymbolEntry } from '../types.js'
+import type { ProjectMap, SymbolEntry } from '../shared/types/index.js'
 
 const COLOR = {
   reset: '\x1b[0m',

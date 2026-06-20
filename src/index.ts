@@ -7,7 +7,7 @@ import { createRequire } from 'node:module'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
-import { loadConfig, MissingConfigError } from './config.js'
+import { loadConfig, MissingConfigError } from './config/index.js'
 import { registerAllTools } from './tools/registerTools.js'
 
 const requireUtil = createRequire(import.meta.url)

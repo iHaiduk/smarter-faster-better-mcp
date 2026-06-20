@@ -3,7 +3,7 @@ import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 
 import { runTraceSymbolPipeline } from '../pipeline/index.js'
 import { resolveWorkspaceRoot } from '../shared/fs/resolveWorkspaceRoot.js'
-import { formatDegraded } from '../format.js'
+import { formatDegraded } from '../bundle/formatter/format.js'
 import { errorMessage } from '../shared/errors/errorMessage.js'
 
 const DESCRIPTION =

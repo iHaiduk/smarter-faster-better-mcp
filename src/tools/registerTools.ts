@@ -1,5 +1,5 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import type { ScoutConfig } from '../types.js'
+import type { ScoutConfig } from '../shared/types/index.js'
 
 import { registerFindCodeTool } from './findCodeTool.js'
 import { registerTraceSymbolTool } from './traceSymbolTool.js'

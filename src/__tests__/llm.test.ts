@@ -1,7 +1,7 @@
 // Refactored: 2026-05-21 — modern JS/TS
 import { describe, expect, test } from 'bun:test'
 
-import { cleanJSON } from '../llm.js'
+import { cleanJSON } from '../shared/utils/json.js'
 
 describe('cleanJSON', () => {
   test('strips ```json fences', () => {
@@ -55,7 +55,7 @@ describe('askCheapLLM tier parsing', () => {
     }) as unknown as typeof fetch
 
     try {
-      const { askCheapLLM } = await import('../llm.js')
+      const { askCheapLLM } = await import('../extraction/llm.js')
       const result = await askCheapLLM(
         'search',
         ['File: a.ts\nfn: x'],
@@ -65,7 +65,6 @@ describe('askCheapLLM tier parsing', () => {
           apiKey: 'lm-studio',
           model: 'openai/gpt-oss-20b',
           llmTimeoutMs: 1000,
-          confidenceThreshold: 0.5,
           llmParallelism: 1,
           parser: 'oxc'
         }

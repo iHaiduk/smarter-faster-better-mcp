@@ -1,50 +1,53 @@
-import { describe, expect, test } from 'bun:test'
-import * as path from 'node:path'
-import * as fs from 'node:fs/promises'
-import { runGetFileContext } from '../pipeline/index.js'
+import { describe, expect, test, afterEach } from 'bun:test'
 import { interceptFileRead, formatInterceptedMarkdown } from '../shared/filtering/interceptor.js'
 
+const originalFetch = global.fetch
+
+function mockFetchLlm(responseContent: string) {
+  global.fetch = async () => new Response(JSON.stringify({
+    choices: [{ message: { content: responseContent } }],
+  }), { status: 200 }) as unknown as Response
+}
+
+function mockFetchFail(status: number) {
+  global.fetch = async () => new Response(null, { status }) as unknown as Response
+}
+
 describe('File Content Interception & Filtering System', () => {
-  const rootDir = path.resolve(import.meta.dir, '../..')
-  const targetPodspecRel = 'ios/Pods/Local Podspecs/ExpoModulesCore.podspec.json'
-
-  test('successfully reads and slices targeted podspec json (lines 1-260)', async () => {
-    const startLine = 1
-    const endLine = 260
-    const query = 'Find subspecs and dependencies configured for ExpoModulesCore'
-
-    const result = await runGetFileContext(targetPodspecRel, startLine, endLine, rootDir, query)
-    const parsed = JSON.parse(result)
-
-    expect(parsed).toHaveProperty('markdown')
-    expect(parsed).toHaveProperty('structuredContent')
-
-    const structured = parsed.structuredContent
-    expect(structured.confidence).toBeGreaterThanOrEqual(0.0)
-    expect(structured.confidence).toBeLessThanOrEqual(1.0)
-    expect(structured.reason).toBe(`AI filtered and analyzed context for file: ${targetPodspecRel}`)
-
-    // Verify the raw mock podspec file is located and sliced correctly
-    const originalText = await fs.readFile(path.resolve(rootDir, targetPodspecRel), 'utf8')
-    const originalLines = originalText.split('\n')
-    expect(originalLines.length).toBeGreaterThanOrEqual(260)
-
-    const expectedSlice = originalLines.slice(0, 260).join('\n')
-    // Sliced content must either be equal to original (fallback) or a processed subset (AI filtered)
-    expect(parsed.markdown).toContain(targetPodspecRel)
-    expect(parsed.markdown).toContain('RELEVANCE')
+  afterEach(() => {
+    global.fetch = originalFetch
   })
 
-  test('interceptFileRead provides robust fallback when LLM config is missing or invalid', async () => {
+  test('interceptFileRead returns LLM-filtered result when LLM responds', async () => {
+    mockFetchLlm(JSON.stringify({
+      relevanceScore: 0.95,
+      contextualExplanation: 'Highly relevant config file',
+      relevantContent: '"key": "value"',
+    }))
+
+    const result = await interceptFileRead('config.json', '{"key": "value"}', 'Find config')
+    expect(result.relevanceScore).toBe(0.95)
+    expect(result.contextualExplanation).toBe('Highly relevant config file')
+  })
+
+  test('interceptFileRead falls back when LLM returns HTTP error', async () => {
+    mockFetchFail(400)
+
     const rawContent = 'const a = 12;\nconsole.log(a);'
     const result = await interceptFileRead('test.ts', rawContent, 'Check variable initialization')
 
-    expect(result).toHaveProperty('relevanceScore')
-    expect(result).toHaveProperty('contextualExplanation')
-    expect(result).toHaveProperty('relevantContent')
+    expect(result.relevanceScore).toBe(1.0)
+    expect(result.relevantContent).toBe(rawContent)
+  })
+
+  test('interceptFileRead falls back when LLM is unreachable', async () => {
+    // Mock fetch to throw a network error (simulating unreachable LLM)
+    global.fetch = async () => { throw new Error('ECONNREFUSED') }
+
+    const rawContent = 'const a = 12;\nconsole.log(a);'
+    const result = await interceptFileRead('test.ts', rawContent, 'Check variable initialization')
 
     expect(result.relevanceScore).toBe(1.0)
-    expect(result.contextualExplanation).toContain('fallback')
     expect(result.relevantContent).toBe(rawContent)
   })
 

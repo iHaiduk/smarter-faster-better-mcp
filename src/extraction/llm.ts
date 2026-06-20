@@ -1,7 +1,9 @@
-// Cheap-LLM client + JSON cleanup.
-import { SYSTEM_PROMPT } from '../config.js'
+// Cheap-LLM client.
+import { SYSTEM_PROMPT } from '../config/index.js'
+import { cleanJSON } from '../shared/utils/json.js'
+import { buildEndpoint } from '../shared/utils/llm-client.js'
 
-import type { LLMCandidate, RelevanceTier, ScoutConfig } from '../types.js'
+import type { LLMCandidate, RelevanceTier, ScoutConfig } from '../shared/types/index.js'
 
 const MAX_LLM_OUTPUT_TOKENS = 300
 
@@ -15,33 +17,6 @@ const VALID_TIERS: ReadonlySet<RelevanceTier> = new Set([
 
 interface ChatCompletionResponse {
   readonly choices: ReadonlyArray<{ readonly message?: { readonly content?: string } }>
-}
-
-/** Strips markdown fences / surrounding text to isolate a JSON payload (objects or arrays). */
-export function cleanJSON(raw: string): string {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/)
-  if (fenced?.[1]) return fenced[1].trim()
-
-  const startObj = raw.indexOf('{')
-  const startArr = raw.indexOf('[')
-
-  const start =
-    startObj !== -1 && startArr !== -1
-      ? Math.min(startObj, startArr)
-      : startObj !== -1 ? startObj : startArr
-
-  const end = start === startObj ? raw.lastIndexOf('}') : raw.lastIndexOf(']')
-
-  if (start !== -1 && end !== -1 && end > start) {
-    return raw.slice(start, end + 1)
-  }
-
-  return raw.trim()
-}
-
-function buildEndpoint(baseUrl: string): URL {
-  const normalized = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
-  return new URL('chat/completions', normalized)
 }
 
 async function singleLLMRequest(

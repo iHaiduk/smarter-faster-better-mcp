@@ -1,4 +1,4 @@
-import type { ParserMode } from '../types/domain.js'
+import type { ParserMode } from '../types/index.js'
 
 export const OXC_SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
   '.ts', '.tsx', '.js', '.jsx', '.json',

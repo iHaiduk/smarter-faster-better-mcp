@@ -1,16 +1,13 @@
 import * as path from 'node:path'
 import dotenv from 'dotenv'
 
-import type { ParserMode, ProjectMap, ScoutConfig } from '../types.js'
+import type { ParserMode, ProjectMap, ScoutConfig } from '../shared/types/index.js'
 import { MissingConfigError, InvalidParserModeError } from '../shared/errors/config-errors.js'
 
 export { MissingConfigError, InvalidParserModeError } from '../shared/errors/config-errors.js'
 export { STOP_WORDS } from '../shared/prompts/stop-words.js'
 export { SYSTEM_PROMPT } from '../shared/prompts/system-prompt.js'
 export { getSourceExtensions } from '../shared/constants/extensions.js'
-
-// Auto-run dotenv loading from process.cwd() upon module import
-dotenv.config({ quiet: true })
 
 export const getMapFilePath = (targetRoot: string): string => path.join(targetRoot, '.project_map.json')
 export const getCacheDir = (targetRoot: string): string => path.join(targetRoot, '.scout-cache')
@@ -21,7 +18,6 @@ export const PARSE_CHUNK_SIZE = 20
 
 const DEFAULTS = {
   llmTimeoutMs: 30_000,
-  confidenceThreshold: 0.5,
   llmParallelism: 2,
 } as const
 
@@ -62,6 +58,7 @@ export function projectMapMatchesParserMode(map: ProjectMap, parserMode = getPar
 
 /** Loads Scout configuration from environment variables and CLI flags. */
 export function loadConfig(): ScoutConfig {
+  dotenv.config({ quiet: true })
   const { SCOUT_BASE_URL: baseUrl, SCOUT_API_KEY: apiKey, SCOUT_MODEL: model } = process.env
 
   if (!baseUrl || !apiKey || !model) {
@@ -80,7 +77,6 @@ export function loadConfig(): ScoutConfig {
     apiKey,
     model,
     llmTimeoutMs: num(process.env['SCOUT_LLM_TIMEOUT_MS'], DEFAULTS.llmTimeoutMs),
-    confidenceThreshold: num(process.env['SCOUT_CONFIDENCE_THRESHOLD'], DEFAULTS.confidenceThreshold),
     llmParallelism: num(process.env['SCOUT_LLM_PARALLELISM'], DEFAULTS.llmParallelism),
     parser: getParserMode(),
   } satisfies ScoutConfig

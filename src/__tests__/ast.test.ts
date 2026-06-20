@@ -1,9 +1,9 @@
 // Refactored: 2026-05-21 — modern JS/TS
 import { describe, expect, test } from 'bun:test'
 
-import { extractName, getLineFromOffset, walkAst } from '../ast.js'
+import { extractName, getLineFromOffset, walkAst } from '../shared/utils/ast.js'
 
-import type { AstNode } from '../types.js'
+import type { AstNode } from '../shared/types/index.js'
 
 function n(type: string, extras: Record<string, unknown> = {}): AstNode {
   return { type, start: 0, end: 0, ...extras }

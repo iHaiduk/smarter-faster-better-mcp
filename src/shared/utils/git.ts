@@ -1,4 +1,4 @@
-import { getParserMode, getSourceExtensions } from '../../config.js'
+import { getParserMode, getSourceExtensions } from '../../config/index.js'
 import { runCommand } from './node.js'
 
 const MAX_GIT_HINT_FILES = 10

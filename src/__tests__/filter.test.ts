@@ -1,9 +1,9 @@
 // Refactored: 2026-05-21 — modern JS/TS
 import { describe, expect, test } from 'bun:test'
 
-import { filterMap, getEditDistance } from '../filter.js'
+import { filterMap, getEditDistance } from '../extraction/matcher/filter.js'
 
-import type { ProjectMap } from '../types.js'
+import type { ProjectMap } from '../shared/types/index.js'
 
 const sample: ProjectMap = {
   generatedAt: 0,

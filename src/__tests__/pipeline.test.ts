@@ -1,15 +1,15 @@
 import { describe, expect, test } from 'bun:test'
 import * as path from 'node:path'
 import { runFindCodePipeline } from '../pipeline/index.js'
-import type { ScoutConfig } from '../types.js'
+import type { ScoutConfig } from '../shared/types/index.js'
 
 const mockConfig: ScoutConfig = {
   baseUrl: 'http://localhost:1234/v1',
   apiKey: 'lm-studio',
   model: 'openai/gpt-oss-20b',
   llmTimeoutMs: 1000,
-  confidenceThreshold: 0.5,
   llmParallelism: 1,
+  parser: 'oxc',
 }
 
 describe('runFindCodePipeline with Custom Search', () => {

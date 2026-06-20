@@ -278,6 +278,23 @@ Forces a complete rebuild of the project AST symbol map and import graph. Use wh
 
 ## 🤖 CRITICAL SYSTEM DIRECTIVES FOR AI AGENTS (LLMs)
 
+### 📋 Quick Integration: AGENTS.template.md
+
+To ensure MCP Scout is used FIRST in any project, add the provided `AGENTS.template.md` section into the project's `AGENTS.md`, `CLAUDE.md`, or equivalent agent instructions file:
+
+```bash
+cat AGENTS.template.md >> /path/to/your/project/AGENTS.md
+```
+
+This template makes Scout tools the **highest priority** for code search, overriding generic `grep`/`Task` fallbacks. It includes:
+
+- Tool-to-purpose mapping table for all 7 Scout tools
+- **Always Do** rules (must-use Scout first, must-retry on failure)
+- **Never Do** rules (no grep/bash/Task when Scout is available)
+- Explicit **Fallback Sequence** (Scout → Task → grep)
+
+Simply copy the content between `<!-- scout:start -->` and `<!-- scout:end -->` into your project's agent instructions file.
+
 If you are an **AI Agent**, **Claude**, **GPT**, or another **LLM client** running inside an IDE or shell environment, you must adhere strictly to the rules below.
 
 > [!IMPORTANT]

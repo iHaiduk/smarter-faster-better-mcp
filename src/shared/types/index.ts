@@ -115,7 +115,6 @@ export interface ScoutConfig {
   readonly apiKey: string
   readonly model: string
   readonly llmTimeoutMs: number
-  readonly confidenceThreshold: number
   readonly llmParallelism: number
   readonly parser: ParserMode
 }

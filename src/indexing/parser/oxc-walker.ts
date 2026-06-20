@@ -2,14 +2,14 @@ import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
 import { parseSync } from 'oxc-parser'
 
-import { extractName, getLineFromOffset, walkAst } from '../../ast.js'
-import { getParserMode } from '../../config.js'
+import { extractName, getLineFromOffset, walkAst } from '../../shared/utils/ast.js'
+import { getParserMode } from '../../config/index.js'
 import { extractJSDoc, buildSignature } from './jsdoc.js'
 import { cleanJsonText, parseJsonFile } from './json-parser.js'
 import { parseFileWithTreeSitter } from './tree-sitter-walker.js'
 import { resolveModulePath } from '../resolver/module-resolver.js'
-import { isAstNode, isIdentifier, SYMBOL_KINDS } from '../../types.js'
-import { fileExists } from '../../utils/nodeUtils.js'
+import { isAstNode, isIdentifier, SYMBOL_KINDS } from '../../shared/types/index.js'
+import { fileExists } from '../../shared/utils/node.js'
 
 import type {
   AstNode,
@@ -21,7 +21,7 @@ import type {
   ParserMode,
   SymbolEntry,
   SymbolKind,
-} from '../../types.js'
+} from '../../shared/types/index.js'
 
 const RELEVANT_KINDS: ReadonlySet<SymbolKind> = new Set(SYMBOL_KINDS)
 

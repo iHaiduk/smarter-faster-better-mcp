@@ -1,7 +1,7 @@
 import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
 
-import { fileExists } from '../../utils/nodeUtils.js'
+import { fileExists } from '../../shared/utils/node.js'
 
 /**
  * Resolves a module specifier (relative or tsconfig-aliased) to a file path

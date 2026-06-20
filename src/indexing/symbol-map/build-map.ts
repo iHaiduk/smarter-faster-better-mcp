@@ -1,13 +1,14 @@
 import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
+import type { Dirent } from 'node:fs'
 
-import { clearL1 } from '../../cache.js'
-import { getMapFilePath, getParserMode, getSourceExtensions, MAX_SYMBOLS, PARSE_CHUNK_SIZE } from '../../config.js'
+import { clearL1 } from '../../cache/l1.js'
+import { getMapFilePath, getParserMode, getSourceExtensions, MAX_SYMBOLS, PARSE_CHUNK_SIZE } from '../../config/index.js'
 import { shouldIgnorePath, IGNORED_DIRS } from '../../shared/constants/ignore-rules.js'
 import { isTestFile } from '../../shared/constants/test-suffixes.js'
 import { loadTsConfigPaths } from '../resolver/tsconfig-paths.js'
 import { parseFile } from '../parser/oxc-walker.js'
-import type { FileMetadata, ParserMode, ProjectMap, SymbolEntry } from '../../types.js'
+import type { FileMetadata, ParserMode, ProjectMap, SymbolEntry } from '../../shared/types/index.js'
 
 const EXTRA_IGNORE_SUFFIXES = ['.d.ts', 'package-lock.json', '.project_map.json'] as const
 
@@ -25,21 +26,30 @@ async function scanDirRecursive(
   files: string[],
   supportedExtensions: ReadonlySet<string>,
 ): Promise<void> {
-  const entries = await fs.readdir(dir, { withFileTypes: true })
-  for (const entry of entries) {
-    const fullPath = path.join(dir, entry.name)
-    const relPath = path.relative(baseDir, fullPath)
-    if (shouldSkipFile(relPath)) continue
-
-    if (entry.isDirectory()) {
-      if (IGNORED_DIRS.includes(entry.name as typeof IGNORED_DIRS[number])) {
-        continue
-      }
-      await scanDirRecursive(fullPath, baseDir, files, supportedExtensions)
-    } else if (entry.isFile()) {
-      const ext = path.extname(entry.name).toLowerCase()
-      if (supportedExtensions.has(ext)) {
-        files.push(relPath)
+  const dirsToScan: string[] = [dir]
+  while (dirsToScan.length > 0) {
+    const currentDir = dirsToScan.pop()!
+    let entries: Dirent[]
+    try {
+      entries = await fs.readdir(currentDir, { withFileTypes: true })
+    } catch {
+      continue
+    }
+    for (const entry of entries) {
+      if (entry.isSymbolicLink()) continue
+      const fullPath = path.join(currentDir, entry.name)
+      const relPath = path.relative(baseDir, fullPath)
+      if (shouldSkipFile(relPath)) continue
+      if (entry.isDirectory()) {
+        if (IGNORED_DIRS.includes(entry.name as typeof IGNORED_DIRS[number])) {
+          continue
+        }
+        dirsToScan.push(fullPath)
+      } else if (entry.isFile()) {
+        const ext = path.extname(entry.name).toLowerCase()
+        if (supportedExtensions.has(ext)) {
+          files.push(relPath)
+        }
       }
     }
   }

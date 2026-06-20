@@ -2,7 +2,7 @@ import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
 
 import { cleanJsonText } from '../parser/json-parser.js'
-import { fileExists } from '../../utils/nodeUtils.js'
+import { fileExists } from '../../shared/utils/node.js'
 
 export async function loadTsConfigPaths(
   targetRoot: string,

@@ -1,27 +1,25 @@
-import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
 
-import { isCacheStale } from '../cache.js'
-import { getParserMode } from '../config.js'
-import { extractWithOxc } from '../extract.js'
-import { fileExists } from '../utils/nodeUtils.js'
-import { filterMap, getDeterministicMatches } from '../filter.js'
+import { isCacheStale } from '../cache/l1.js'
+import { extractWithOxc } from '../extraction/extract.js'
+import { filterMap, getDeterministicMatches } from '../extraction/matcher/filter.js'
 import {
   formatFound,
   formatNotFound,
   serializeForLLM,
   toStructuredJSON,
-} from '../format.js'
-import { getGitStatusMap, getGitHint } from '../git.js'
-import { askCheapLLM } from '../llm.js'
-import { findDeps } from '../deps.js'
-import { buildMap, getProjectFiles } from '../indexing/symbol-map/build-map.js'
+} from '../bundle/formatter/format.js'
+import { getGitStatusMap, getGitHint } from '../shared/utils/git.js'
+import { askCheapLLM } from '../extraction/llm.js'
+import { findDeps } from '../dependency-resolver/deps.js'
+import { buildMap } from '../indexing/symbol-map/build-map.js'
 import { isTestFile } from '../shared/constants/test-suffixes.js'
 import { TIER_SCORE } from '../shared/constants/tier-scores.js'
 import { resolveBudget } from '../shared/constants/budget.js'
 import { parseCustomQuery, runCustomSearch } from '../extraction/custom-search/searcher.js'
 import { readMap, lookupCached, storeCached, chunkSymbols } from '../cache/map-cache.js'
 import { interceptFileRead, formatInterceptedMarkdown } from '../shared/filtering/interceptor.js'
+import { resolveSecurePath } from './resolve-path.js'
 
 import type {
   ExtractedSymbol,
@@ -30,11 +28,10 @@ import type {
   ScoutConfig,
   ContextBudgetOptions,
   RelevanceTier,
-} from '../types.js'
+} from '../shared/types/index.js'
 
 const MAX_CHUNKS = 5
 const FILE_CONTEXT_SYMBOL = 'FILE_CONTEXT'
-const FILE_MATCH_SYMBOL = 'FILE_MATCH'
 
 /** Runs the full find_code pipeline and returns unified structured JSON containing human-markdown. */
 export async function runFindCodePipeline(
@@ -63,7 +60,8 @@ export async function runFindCodePipeline(
   const { maxFiles, maxSymbols, maxChars, includeTests } = resolvedBudget
 
   const deterministicCandidates = getDeterministicMatches(map, task, includeTests)
-  const hasHighConfidenceMatch = deterministicCandidates.length > 0 && deterministicCandidates[0]!.confidence >= 0.95
+  const firstCandidate = deterministicCandidates[0]
+  const hasHighConfidenceMatch = firstCandidate !== undefined && firstCandidate.confidence >= 0.95
 
   let candidates: LLMCandidate[]
   let isDeterministic: boolean
@@ -71,7 +69,7 @@ export async function runFindCodePipeline(
   if (hasHighConfidenceMatch) {
     candidates = deterministicCandidates
     isDeterministic = true
-    console.error(`[Scout] Skipped cheap LLM (Deterministic Match Confidence: ${deterministicCandidates[0]!.confidence})`)
+    console.error(`[Scout] Skipped cheap LLM (Deterministic Match Confidence: ${firstCandidate!.confidence})`)
   } else {
     const filtered = filterMap(map, task)
     const chunkCount = Math.max(1, Math.min(config.llmParallelism, MAX_CHUNKS))
@@ -152,7 +150,7 @@ export async function runFindCodePipeline(
   return toStructuredJSON(
     mainMarkdown,
     budgetedResults.symbols,
-    budgetedResults.symbols.length > 0 ? budgetedResults.symbols[0]!.candidate.confidence : 1.0,
+    budgetedResults.symbols[0]?.candidate.confidence ?? 1.0,
     reason,
     missingContextHints,
     followUpQueries,
@@ -271,32 +269,6 @@ export async function runTraceSymbolPipeline(
   )
 }
 
-/** Validates that `fileRelPath` resolves strictly inside `targetRoot` and returns the real path. */
-async function resolveSecurePath(
-  fileRelPath: string,
-  targetRoot: string,
-): Promise<{ realPath: string } | { error: string }> {
-  const rootRealPath = await fs.realpath(targetRoot).catch(() => path.resolve(targetRoot))
-  const absPath = path.resolve(rootRealPath, fileRelPath)
-
-  const preRealpathRel = path.relative(rootRealPath, absPath)
-  if (preRealpathRel.startsWith('..') || path.isAbsolute(preRealpathRel)) {
-    return { error: `[Scout] Access denied: file is outside of the workspace root: ${fileRelPath}` }
-  }
-
-  if (!(await fileExists(absPath))) {
-    return { error: `[Scout] File not found: ${fileRelPath}` }
-  }
-
-  const fileRealPath = await fs.realpath(absPath)
-  const postRealpathRel = path.relative(rootRealPath, fileRealPath)
-  if (postRealpathRel.startsWith('..') || path.isAbsolute(postRealpathRel)) {
-    return { error: `[Scout] Access denied: file resolves outside of the workspace root: ${fileRelPath}` }
-  }
-
-  return { realPath: fileRealPath }
-}
-
 /** Securely reads context of a specific file range. */
 export async function runGetFileContext(
   fileRelPath: string,
@@ -344,39 +316,6 @@ export async function runGetFileContext(
     [],
     [],
     map,
-  )
-}
-
-/** Searches files by pattern inside the workspace. */
-export async function runFindFiles(pattern: string, targetRoot = process.cwd()): Promise<string> {
-  const files = await getProjectFiles(targetRoot, getParserMode())
-  const cleanPat = pattern.replace(/\*/g, '.*')
-  const regex = new RegExp(`^${cleanPat}$`, 'i')
-  const matches = files.filter((f) => regex.test(f) || f.toLowerCase().includes(pattern.toLowerCase()))
-
-  const markdown = [
-    `### Found ${matches.length} files matching: "${pattern}"`,
-    ...matches.map((m) => `- ${m}`),
-  ].join('\n')
-
-  const results: ExtractedSymbol[] = matches.map((m) => ({
-    candidate: { file: m, symbol: FILE_MATCH_SYMBOL, confidence: 1.0 },
-    code: '',
-    signature: '',
-    doc: '',
-    imports: [],
-    importedBy: [],
-    extractionOk: true,
-    relevanceTier: 'mustRead' as const,
-  }))
-
-  return toStructuredJSON(
-    markdown,
-    results,
-    1.0,
-    `Discovered ${matches.length} files matching pattern.`,
-    [],
-    [],
   )
 }
 

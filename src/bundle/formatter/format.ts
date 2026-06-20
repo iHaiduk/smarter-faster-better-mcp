@@ -4,7 +4,7 @@ import type {
   SymbolEntry,
   SymbolKind,
   ProjectMap,
-} from '../../types.js'
+} from '../../shared/types/index.js'
 
 const MAX_SIG_CHARS = 80
 const MAX_DOC_CHARS = 60

@@ -4,10 +4,10 @@ import * as fs from 'node:fs/promises'
 import { parseSync } from 'oxc-parser'
 import type { Node as SyntaxNode } from 'web-tree-sitter'
 
-import { extractName, getBodyStartOffset, getLineFromOffset, walkAst } from '../ast.js'
-import { isIdentifier } from '../types.js'
+import { extractName, getBodyStartOffset, getLineFromOffset, walkAst } from '../shared/utils/ast.js'
+import { isIdentifier } from '../shared/types/index.js'
 import { createTreeSitterParser, findTreeSitterNameNode, getTreeSitterLanguage } from '../indexing/parser/tree-sitter-runtime.js'
-import { getParserMode } from '../config.js'
+import { getParserMode } from '../config/index.js'
 import { fileExists } from '../shared/utils/node.js'
 import {
   extractFallback,
@@ -15,7 +15,7 @@ import {
   missingFileResult,
 } from './fragment/extract-fallbacks.js'
 
-import type { AstNode, ExtractedSymbol, LLMCandidate, ProjectMap } from '../types.js'
+import type { AstNode, ExtractedSymbol, LLMCandidate, ProjectMap } from '../shared/types/index.js'
 
 const MAX_TYPE_DEFS = 3
 

@@ -1,4 +1,4 @@
-import type { ContextBudgetOptions } from '../types/domain.js'
+import type { ContextBudgetOptions } from '../types/index.js'
 
 export const DEFAULT_BUDGET = {
   maxFiles: 5,

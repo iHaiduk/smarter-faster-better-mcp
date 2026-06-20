@@ -1,12 +1,12 @@
 import * as fs from 'node:fs/promises'
 
-import { getMapFilePath, projectMapMatchesParserMode } from '../config.js'
+import { getMapFilePath, projectMapMatchesParserMode } from '../config/index.js'
 import { fileExists } from '../shared/utils/node.js'
 import { buildMap } from '../indexing/symbol-map/build-map.js'
 import { l1Cache, l1Key } from './l1.js'
 import { l2Get, l2Set } from './l2.js'
 
-import type { ExtractedSymbol, LLMCandidate, ProjectMap, SymbolEntry } from '../types.js'
+import type { ExtractedSymbol, LLMCandidate, ProjectMap, SymbolEntry } from '../shared/types/index.js'
 
 /** Reads the persisted project map from disk, or rebuilds it on miss/schema mismatch. */
 export async function readMap(targetRoot: string): Promise<ProjectMap> {

@@ -1,4 +1,4 @@
-import type { ExtractedSymbol, LLMCandidate, SymbolEntry } from '../../types.js'
+import type { ExtractedSymbol, LLMCandidate, SymbolEntry } from '../../shared/types/index.js'
 
 const FALLBACK_LINES = 20
 

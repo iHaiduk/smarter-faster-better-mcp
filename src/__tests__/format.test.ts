@@ -1,9 +1,9 @@
 // Refactored: 2026-05-21 — modern JS/TS
 import { describe, expect, test } from 'bun:test'
 
-import { formatDegraded, formatFound, formatNotFound, kindShort, serializeForLLM, toStructuredJSON } from '../format.js'
+import { formatDegraded, formatFound, formatNotFound, kindShort, serializeForLLM, toStructuredJSON } from '../bundle/formatter/format.js'
 
-import type { ExtractedSymbol, SymbolEntry } from '../types.js'
+import type { ExtractedSymbol, SymbolEntry } from '../shared/types/index.js'
 
 const baseExtraction: ExtractedSymbol = {
   candidate: { file: 'src/cache.ts', symbol: 'userCache', confidence: 0.9 },

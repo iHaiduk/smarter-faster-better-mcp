@@ -5,7 +5,7 @@ export function cleanJsonText(text: string): string {
   )
 }
 
-import type { SymbolEntry } from '../../types.js'
+import type { SymbolEntry } from '../../shared/types/index.js'
 
 function parseJsonFile(source: string, relPath: string): SymbolEntry[] {
   try {

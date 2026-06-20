@@ -1,6 +1,6 @@
 import type { Node as SyntaxNode } from 'web-tree-sitter'
 import { createTreeSitterParser, findTreeSitterNameNode, getTreeSitterLanguage } from './tree-sitter-runtime.js'
-import type { FileMetadata, SymbolEntry, SymbolKind } from '../../types.js'
+import type { FileMetadata, SymbolEntry, SymbolKind } from '../../shared/types/index.js'
 
 const KIND_BY_NODE_TYPE: ReadonlyMap<string, SymbolKind> = new Map([
   ['function_definition', 'FunctionDeclaration'],

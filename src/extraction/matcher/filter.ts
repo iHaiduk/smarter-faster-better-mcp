@@ -1,8 +1,8 @@
 import * as path from 'node:path'
-import { MAX_SYMBOLS_FOR_LLM, STOP_WORDS } from '../../config.js'
+import { MAX_SYMBOLS_FOR_LLM, STOP_WORDS } from '../../config/index.js'
 import { isTestFile } from '../../shared/constants/test-suffixes.js'
 
-import type { ProjectMap, SymbolEntry, LLMCandidate } from '../../types.js'
+import type { ProjectMap, SymbolEntry, LLMCandidate } from '../../shared/types/index.js'
 
 const MIN_KEYWORD_LEN = 3
 const FUZZY_MIN_WORD_LEN = 4

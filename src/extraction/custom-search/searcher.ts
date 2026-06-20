@@ -1,15 +1,16 @@
 import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
 
-import { getParserMode } from '../../config.js'
-import { getGitStatusMap } from '../../git.js'
-import { formatFound, toStructuredJSON } from '../../format.js'
+import { getParserMode } from '../../config/index.js'
+import { getGitStatusMap } from '../../shared/utils/git.js'
+import { formatFound, toStructuredJSON } from '../../bundle/formatter/format.js'
 import { getProjectFiles } from '../../indexing/symbol-map/build-map.js'
 import { readMap } from '../../cache/map-cache.js'
 import { resolveBudget } from '../../shared/constants/budget.js'
 import { shouldIgnorePath } from '../../shared/constants/ignore-rules.js'
+import { globToRegex } from '../../shared/utils/glob.js'
 
-import type { ContextBudgetOptions, ExtractedSymbol, LLMCandidate, ProjectMap } from '../../types.js'
+import type { ContextBudgetOptions, ExtractedSymbol, LLMCandidate, ProjectMap } from '../../shared/types/index.js'
 
 // Custom search limits — keep custom regex search bounded to prevent ReDoS / DoS.
 const CUSTOM_SEARCH_MAX_PATTERN_LEN = 200
@@ -39,8 +40,8 @@ export interface CustomQuery {
 export function parseCustomQuery(task: string): CustomQuery | null {
   const match = task.trim().match(CUSTOM_QUERY_REGEX)
   if (!match) return null
-  const pattern = match[1]!.trim()
-  const globPattern = match[2]!.trim()
+  const pattern = match[1]?.trim() ?? ''
+  const globPattern = match[2]?.trim() ?? ''
   if (!pattern || !globPattern) return null
   if (pattern.length > CUSTOM_SEARCH_MAX_PATTERN_LEN) return null
   // Reject path traversal / absolute globs up-front so file scanning never leaves the workspace.
@@ -76,38 +77,6 @@ function isInsideRoot(root: string, relPath: string): boolean {
 
 function looksBinary(file: string): boolean {
   return BINARY_EXTS.has(path.extname(file).toLowerCase())
-}
-
-function globToRegex(glob: string): RegExp {
-  let regexStr = ''
-  let i = 0
-  while (i < glob.length) {
-    const char = glob[i]
-    if (char === undefined) break
-    if (char === '*') {
-      if (glob[i + 1] === '*') {
-        regexStr += '.*'
-        i += 2
-        if (glob[i] === '/') {
-          regexStr += '/?'
-          i++
-        }
-      } else {
-        regexStr += '[^/]*'
-        i++
-      }
-    } else if (char === '?') {
-      regexStr += '[^/]'
-      i++
-    } else if (['.', '+', '^', '$', '{', '}', '(', ')', '|', '[', ']', '\\'].includes(char)) {
-      regexStr += '\\' + char
-      i++
-    } else {
-      regexStr += char
-      i++
-    }
-  }
-  return new RegExp(`(?:^|/)${regexStr}$`, 'i')
 }
 
 /** Runs a literal/regex keyword search across files matching `globPattern`, capped by budget. */
