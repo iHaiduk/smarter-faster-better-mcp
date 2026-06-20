@@ -17,6 +17,8 @@ import { isTestFile } from '../shared/constants/test-suffixes.js'
 import { TIER_SCORE } from '../shared/constants/tier-scores.js'
 import { resolveBudget } from '../shared/constants/budget.js'
 import { parseCustomQuery, runCustomSearch } from '../extraction/custom-search/searcher.js'
+import { analyzeQuery } from '../extraction/query-analyzer.js'
+import { validateExtractedSymbols } from '../extraction/content-validator.js'
 import { readMap, lookupCached, storeCached, chunkSymbols } from '../cache/map-cache.js'
 import { interceptFileRead, formatInterceptedMarkdown } from '../shared/filtering/interceptor.js'
 import { resolveSecurePath } from './resolve-path.js'
@@ -59,9 +61,19 @@ export async function runFindCodePipeline(
   const resolvedBudget = resolveBudget(budget)
   const { maxFiles, maxSymbols, maxChars, includeTests } = resolvedBudget
 
-  const deterministicCandidates = getDeterministicMatches(map, task, includeTests)
+  // Step 1: Analyze query to understand intent and extract search terms
+  const analysis = await analyzeQuery(task, config)
+  if (analysis) {
+    console.error(
+      `[Scout] Query analysis: intent=${analysis.intent}, symbols=[${analysis.symbolNames.join(',')}], terms=[${analysis.expandedTerms.slice(0, 5).join(',')}]`,
+    )
+  }
+
+  // Step 2: Deterministic matching (enhanced with analysis)
+  const deterministicCandidates = getDeterministicMatches(map, task, includeTests, analysis)
   const firstCandidate = deterministicCandidates[0]
-  const hasHighConfidenceMatch = firstCandidate !== undefined && firstCandidate.confidence >= 0.95
+  const deterministicConfidence = firstCandidate?.confidence ?? 0
+  const hasHighConfidenceMatch = deterministicConfidence >= 0.95
 
   let candidates: LLMCandidate[]
   let isDeterministic: boolean
@@ -69,9 +81,10 @@ export async function runFindCodePipeline(
   if (hasHighConfidenceMatch) {
     candidates = deterministicCandidates
     isDeterministic = true
-    console.error(`[Scout] Skipped cheap LLM (Deterministic Match Confidence: ${firstCandidate!.confidence})`)
+    console.error(`[Scout] Skipped cheap LLM (Deterministic Match Confidence: ${deterministicConfidence})`)
   } else {
-    const filtered = filterMap(map, task)
+    // Step 3: LLM-assisted matching (enhanced with analysis context)
+    const filtered = filterMap(map, task, analysis)
     const chunkCount = Math.max(1, Math.min(config.llmParallelism, MAX_CHUNKS))
     const chunks = chunkSymbols(filtered, chunkCount)
 
@@ -80,7 +93,7 @@ export async function runFindCodePipeline(
       getGitHint(targetRoot),
     ])
 
-    const llmResult = await askCheapLLM(task, compactMaps, gitHint, config)
+    const llmResult = await askCheapLLM(task, compactMaps, gitHint, config, analysis)
 
     if (llmResult) {
       candidates = llmResult
@@ -132,8 +145,16 @@ export async function runFindCodePipeline(
 
   const budgetedResults = await applyBudget(rankedList, summaryOnly, map, targetRoot, maxFiles, maxSymbols, maxChars)
 
+  // Step 4: Validate extracted content against query to filter false positives.
+  // Skip for deterministic high-confidence matches — the symbol name IS in the project map,
+  // so content is guaranteed correct; running validation would waste an LLM call.
+  const validatedSymbols =
+    isDeterministic && deterministicConfidence >= 0.95
+      ? budgetedResults.symbols
+      : await validateExtractedSymbols(budgetedResults.symbols, task, analysis, config)
+
   const gitStatusMap = await getGitStatusMap(targetRoot)
-  const mainMarkdown = formatFound(budgetedResults.symbols, gitStatusMap)
+  const mainMarkdown = formatFound(validatedSymbols, gitStatusMap)
 
   const reason = isDeterministic
     ? 'Identified via high-confidence deterministic naming preflight.'
@@ -143,14 +164,14 @@ export async function runFindCodePipeline(
     ? [`Omitted ${budgetedResults.omittedCount} lower-priority symbols because of context budget limits.`]
     : []
 
-  const followUpQueries = budgetedResults.symbols
+  const followUpQueries = validatedSymbols
     .filter((r) => r.relevanceTier === 'mustRead')
     .map((r) => `trace_symbol: ${r.candidate.symbol}`)
 
   return toStructuredJSON(
     mainMarkdown,
-    budgetedResults.symbols,
-    budgetedResults.symbols[0]?.candidate.confidence ?? 1.0,
+    validatedSymbols,
+    validatedSymbols[0]?.candidate.confidence ?? 1.0,
     reason,
     missingContextHints,
     followUpQueries,

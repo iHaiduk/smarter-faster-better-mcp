@@ -77,10 +77,10 @@ The architecture has evolved into a highly modular, decoupled multi-pipeline eng
 ```mermaid
 graph TD
     UserQuery["User Request"] --> MCPClient["AI Client (Cursor, Claude, etc.)"]
-    
+
     subgraph MCP Scout Server
         MCPClient --> Tools
-        
+
         subgraph Tools ["Exposed MCP Tools Boundaries (src/tools/)"]
             FindCode["find_code"]
             TraceSymbol["trace_symbol"]
@@ -90,24 +90,24 @@ graph TD
             ExplainPack["explain_context_pack"]
             RefreshMap["refresh_map"]
         end
-        
+
         Tools --> Indexer{"Map Cached?"}
         Indexer -- No --> Parser["Oxc AST Parser (TS/JS/JSON)"]
         Parser --> WriteMap["Build .project_map.json"]
-        WriteMap --> Filter["Jaro-Winkler Filter"]
-        Indexer -- Yes --> Filter
-        
-        Filter --> Pipelines
-        
-        subgraph Pipelines ["Context Pipelines (src/pipeline/)"]
-            SearchPipe["LLM Search & Ranking"]
-            DepsPipe["AST Import Graph Resolution"]
-            FilePipe["Line-Range Extractor"]
-        end
-        
-        Pipelines --> Formatter["Markdown / JSON Formatter"]
+        WriteMap --> QueryAnalysis["Step 1: Query Analysis (LLM)"]
+        Indexer -- Yes --> QueryAnalysis
+
+        QueryAnalysis --> DetMatch["Step 2: Deterministic Matching"]
+        DetMatch --> HighConfidence{"Confidence ≥ 0.95?"}
+        HighConfidence -- Yes --> Extraction["AST Extraction"]
+        HighConfidence -- No --> LLMFilter["Step 3: LLM Search & Ranking"]
+        LLMFilter --> Extraction
+
+        Extraction --> Budget["Apply Context Budget"]
+        Budget --> ContentVal["Step 4: Content Validation"]
+        ContentVal --> Formatter["Markdown / JSON Formatter"]
     end
-    
+
     Formatter --> AIResponse["AI Consumes Optimized Context"]
 ```
 
@@ -118,6 +118,13 @@ Our codebase adheres to rigorous standards (no function exceeding 20 lines, zero
 - **`src/shared/`**: Decoupled shared domain objects, utilities, types, and error managers (e.g. `src/shared/fs/resolveWorkspaceRoot.ts`, `src/shared/errors/errorMessage.ts`).
 - **`src/indexing/`**: Core parsing engines (`oxc-walker.ts`, `tree-sitter-walker.ts`) and path resolvers that handle module mapping and TSConfig `paths`.
 - **`src/pipeline/`**: The orchestration layers that pipeline complex workflows into clean markdown responses.
+- **`src/extraction/`**: Query analysis (`query-analyzer.ts`), LLM client (`llm.ts`), content validation (`content-validator.ts`), and matching (`matcher/filter.ts`).
+
+### 🔒 Read-Only Contract
+MCP Scout is **read-only** with respect to your project source code. It never modifies, creates, or deletes user files. The only writes are to its own cache:
+- **`.project_map.json`** — cached AST symbol map (reused across requests until stale).
+- **`.scout-cache/`** — L2 extraction cache (per-symbol code extractions, invalidated on source file changes).
+- Both can be safely cleaned with `cleanup_workspace` or deleted manually.
 
 ---
 
@@ -245,7 +252,7 @@ claude mcp add scout npx smarter-faster-better-mcp
 The MCP server exposes a rich set of tools to power the AI context engine:
 
 ### `find_code`
-*CRITICAL: Use this tool FIRST to search for code.* AST-based search with deterministic preflight and query expansion.
+*CRITICAL: Use this tool FIRST to search for code.* 4-step pipeline: (1) LLM query analysis extracts intent, symbol names, expanded terms, and file patterns; (2) deterministic matching enhanced with analysis; (3) LLM-assisted ranking with analysis context; (4) content validation filters false positives by checking extracted code against the query.
 - **Parameters**: `task`, `summaryOnly`, `workspaceRoot`, `maxFiles`, `maxSymbols`, `maxChars`, `includeTests`
 
 ### `trace_symbol`

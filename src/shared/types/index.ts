@@ -119,6 +119,16 @@ export interface ScoutConfig {
   readonly parser: ParserMode
 }
 
+export type QueryIntent = 'specificSymbol' | 'featureSearch' | 'conceptSearch' | 'fileSearch'
+
+export interface QueryAnalysis {
+  readonly intent: QueryIntent
+  readonly symbolNames: readonly string[]
+  readonly expandedTerms: readonly string[]
+  readonly filePatterns: readonly string[]
+  readonly description: string
+}
+
 // Minimal structural typing for oxc-parser AST nodes — the parser returns
 // loosely-typed JSON-like trees, so we narrow with type guards at call sites.
 export interface AstNode {

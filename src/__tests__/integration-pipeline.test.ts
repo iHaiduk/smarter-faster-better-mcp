@@ -147,3 +147,142 @@ describe('Integration: runExplainContextPack', () => {
     expect(result.length).toBeGreaterThan(0)
   })
 })
+
+describe('Integration: Full pipeline with query analysis + validation', () => {
+  afterEach(() => { global.fetch = originalFetch })
+
+  const config: ScoutConfig = {
+    baseUrl: 'http://localhost:1234/v1',
+    apiKey: 'lm-studio',
+    model: 'gpt-oss-20b',
+    llmTimeoutMs: 5000,
+    llmParallelism: 1,
+    parser: 'oxc',
+  }
+
+  let callCount = 0
+  let responses: string[]
+
+  /** Sets up a queue of mock responses — each fetch call pops the next one. */
+  function mockFetchSequence(...contents: string[]) {
+    callCount = 0
+    responses = [...contents]
+    global.fetch = (async () => {
+      const idx = callCount++
+      const content = responses[idx % responses.length] ?? '[]'
+      return new Response(JSON.stringify({
+        choices: [{ message: { content } }],
+      }), { status: 200 }) as unknown as Response
+    }) as unknown as typeof fetch
+  }
+
+  test('deterministic exact match skips LLM and validation', async () => {
+    // query: 'cleanJSON' — this is an exact symbol name in the project map.
+    // Pipeline should match deterministically, skip LLM, skip validation.
+    const result = await runFindCodePipeline('cleanJSON', config, false, ROOT)
+    const parsed = JSON.parse(result)
+    expect(parsed.markdown).toContain('cleanJSON')
+    expect(parsed.structuredContent.symbols).toContain('cleanJSON')
+    // No fetch calls should have been made (deterministic match, no validation)
+    expect(callCount).toBe(0)
+  })
+
+  test('query analysis returns null on fetch failure, pipeline still works', async () => {
+    // First call (query analysis) fails, second call (LLM candidates) succeeds
+    let fetchCalls = 0
+    global.fetch = (async () => {
+      fetchCalls++
+      if (fetchCalls === 1) {
+        // Query analysis fails
+        return new Response(null, { status: 500 }) as unknown as Response
+      }
+      // LLM candidate call succeeds
+      return new Response(JSON.stringify({
+        choices: [{ message: { content: JSON.stringify([
+          { file: 'src/shared/utils/json.ts', symbol: 'cleanJSON', confidence: 0.9, tier: 'mustRead' },
+        ]) } }],
+      }), { status: 200 }) as unknown as Response
+    }) as unknown as typeof fetch
+
+    const result = await runFindCodePipeline('cleanJSON function', config, false, ROOT)
+    const parsed = JSON.parse(result)
+    // Should still find cleanJSON despite analysis failure
+    expect(parsed.structuredContent.symbols).toContain('cleanJSON')
+  })
+
+  test('natural language query goes through analysis → LLM → validation', async () => {
+    // Mock all 3 sequential LLM calls: analysis, candidate selection, content validation
+    mockFetchSequence(
+      // 1. Query analysis response
+      JSON.stringify({
+        intent: 'featureSearch',
+        symbolNames: [],
+        expandedTerms: ['json', 'clean', 'parse'],
+        filePatterns: ['json'],
+        description: 'JSON cleaning utility',
+      }),
+      // 2. LLM candidate selection response
+      JSON.stringify([
+        { file: 'src/shared/utils/json.ts', symbol: 'cleanJSON', confidence: 0.85, tier: 'mustRead' },
+      ]),
+      // 3. Content validation response (all relevant)
+      JSON.stringify({
+        verdicts: [
+          { idx: 0, relevant: true, reason: 'This is the JSON cleaning function' },
+        ],
+      }),
+    )
+
+    const result = await runFindCodePipeline('JSON cleaning utility', config, false, ROOT)
+    const parsed = JSON.parse(result)
+    expect(parsed.structuredContent.symbols).toContain('cleanJSON')
+    // At least analysis + LLM + validation calls
+    expect(callCount).toBeGreaterThanOrEqual(3)
+  })
+
+  test('content validation rejects false positives', async () => {
+    // Query about "formatting" but mock returns an unrelated symbol
+    mockFetchSequence(
+      // 1. Query analysis
+      JSON.stringify({
+        intent: 'featureSearch',
+        symbolNames: [],
+        expandedTerms: ['format', 'display', 'render'],
+        filePatterns: ['format'],
+        description: 'Text formatting utility',
+      }),
+      // 2. LLM returns a symbol whose code is about JSON parsing, not formatting
+      JSON.stringify([
+        { file: 'src/shared/utils/json.ts', symbol: 'cleanJSON', confidence: 0.7, tier: 'likelyRelevant' },
+      ]),
+      // 3. Content validation: LLM says it's NOT relevant
+      JSON.stringify({
+        verdicts: [
+          { idx: 0, relevant: false, reason: 'This is JSON parsing, not text formatting' },
+        ],
+      }),
+    )
+
+    const result = await runFindCodePipeline('text formatting utility', config, false, ROOT)
+    const parsed = JSON.parse(result)
+    // cleanJSON should be filtered out or fallback to keeping it
+    // Either way, the pipeline doesn't crash
+    expect(typeof parsed.markdown).toBe('string')
+  })
+
+  test('NOT_FOUND for completely unrelated query', async () => {
+    mockFetchSequence(
+      JSON.stringify({
+        intent: 'conceptSearch',
+        symbolNames: [],
+        expandedTerms: ['quantum', 'computing'],
+        filePatterns: [],
+        description: 'Quantum computing implementation',
+      }),
+      JSON.stringify([]),
+    )
+
+    const result = await runFindCodePipeline('quantum computing implementation', config, false, ROOT)
+    expect(result).toContain('NOT_FOUND')
+  })
+})

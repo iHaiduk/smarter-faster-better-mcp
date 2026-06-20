@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.6.0] - 2026-06-20
+
+### Added
+- **Query Analysis** (`query-analyzer.ts`): LLM-powered query analysis that classifies intent (specificSymbol, featureSearch, conceptSearch, fileSearch), extracts symbol names, expanded search terms, and file patterns before searching. Runs as the first step of the `find_code` pipeline with a 5s timeout and graceful fallback on failure.
+- **Content Validation** (`content-validator.ts`): Post-extraction validation that checks whether extracted code actually matches the user's query. Two-layer approach: deterministic keyword scoring (instant) + LLM batch validation for borderline cases. Skipped for high-confidence deterministic matches to avoid unnecessary LLM calls.
+- **Shared LLM Client** (`llm-client.ts`): Extracted common LLM fetch boilerplate (endpoint building, Authorization header, timeout management, error handling) into a reusable `llmFetch()` function. Used by query analyzer, content validator, and main LLM client.
+- Integration tests for the full 4-step pipeline: query analysis → deterministic matching → LLM ranking → content validation.
+- Read-only contract documentation: MCP Scout never modifies user source code; only writes to its own cache (`.project_map.json`, `.scout-cache/`).
+
+### Changed
+- `find_code` pipeline now has 4 explicit steps: (1) query analysis, (2) deterministic matching enhanced with analysis, (3) LLM-assisted ranking with analysis context, (4) content validation.
+- `filterMap` and `getDeterministicMatches` accept optional `QueryAnalysis` to boost relevant symbols via expanded terms, file patterns, and symbol name matching.
+- `askCheapLLM` receives query analysis context to improve LLM symbol ranking.
+- System prompt updated to instruct LLM to use query hints for broader semantic matching.
+- Architecture diagram and tool descriptions updated in README.
+
+---
+
 ## [0.5.5] - 2026-05-27
 
 ### Changed

@@ -2,7 +2,7 @@ import * as path from 'node:path'
 import { MAX_SYMBOLS_FOR_LLM, STOP_WORDS } from '../../config/index.js'
 import { isTestFile } from '../../shared/constants/test-suffixes.js'
 
-import type { ProjectMap, SymbolEntry, LLMCandidate } from '../../shared/types/index.js'
+import type { ProjectMap, SymbolEntry, LLMCandidate, QueryAnalysis } from '../../shared/types/index.js'
 
 const MIN_KEYWORD_LEN = 3
 const FUZZY_MIN_WORD_LEN = 4
@@ -90,13 +90,53 @@ function scoreSymbol(sym: SymbolEntry, keywords: readonly KeywordSpec[]): number
   return score
 }
 
-/** Returns the subset of `map.symbols` most relevant to `task`, capped at `MAX_SYMBOLS_FOR_LLM`. */
-export function filterMap(map: ProjectMap, task: string): SymbolEntry[] {
+/**
+ * Returns the subset of `map.symbols` most relevant to `task`, capped at `MAX_SYMBOLS_FOR_LLM`.
+ * When `analysis` is provided, also uses expanded terms, file patterns, and symbol names
+ * from query analysis to improve recall.
+ */
+export function filterMap(
+  map: ProjectMap,
+  task: string,
+  analysis?: QueryAnalysis | null,
+): SymbolEntry[] {
   const keywords = prepareKeywords(task)
-  if (keywords.length === 0) return map.symbols.slice(0, MAX_SYMBOLS_FOR_LLM)
+
+  // Build additional keywords from analysis expanded terms
+  const expandedKeywords: KeywordSpec[] = analysis
+    ? analysis.expandedTerms.flatMap((term) => prepareKeywords(term))
+    : []
+
+  const filePatterns = analysis?.filePatterns ?? []
+  const symbolNames = analysis?.symbolNames ?? []
+
+  const allKeywords = [...keywords, ...expandedKeywords]
+  if (allKeywords.length === 0 && filePatterns.length === 0 && symbolNames.length === 0) {
+    return map.symbols.slice(0, MAX_SYMBOLS_FOR_LLM)
+  }
 
   const scored = map.symbols
-    .map((sym) => ({ sym, score: scoreSymbol(sym, keywords) }))
+    .map((sym) => {
+      let score = scoreSymbol(sym, allKeywords)
+
+      // Boost for symbols whose names match analysis-extracted symbol names
+      for (const name of symbolNames) {
+        const cleanName = name.toLowerCase()
+        const cleanSym = sym.name.toLowerCase()
+        if (cleanSym.includes(cleanName) || cleanName.includes(cleanSym)) {
+          score += 3
+        }
+      }
+
+      // Boost for symbols in files matching analysis file patterns
+      for (const pattern of filePatterns) {
+        if (sym.file.toLowerCase().includes(pattern.toLowerCase())) {
+          score += 1
+        }
+      }
+
+      return { sym, score }
+    })
     .filter(({ score }) => score > 0)
     .toSorted((a, b) => b.score - a.score)
     .map(({ sym }) => sym)
@@ -114,15 +154,20 @@ function cleanCasing(str: string): string {
 
 /**
  * Computes deterministic matches using casing mappings, exact symbols, and pattern matching.
+ * When `analysis` is provided, also matches against analysis-extracted symbol names
+ * and file patterns for better recall on natural language queries.
  * Returns LLMCandidates with calculated confidences.
  */
 export function getDeterministicMatches(
   map: ProjectMap,
   task: string,
   includeTests = false,
+  analysis?: QueryAnalysis | null,
 ): LLMCandidate[] {
   const keywords = prepareKeywords(task).map((k) => k.word)
-  if (keywords.length === 0) return []
+  const analysisSymbolNames = analysis?.symbolNames ?? []
+
+  if (keywords.length === 0 && analysisSymbolNames.length === 0) return []
 
   const cleanTask = cleanCasing(task)
   const candidates: LLMCandidate[] = []
@@ -135,8 +180,23 @@ export function getDeterministicMatches(
     const cleanSymName = cleanCasing(sym.name)
     let confidence = 0
 
+    // 0. Match against analysis-extracted symbol names (highest priority)
+    for (const name of analysisSymbolNames) {
+      const cleanName = cleanCasing(name)
+      if (
+        cleanName.length >= 3 &&
+        (cleanSymName === cleanName || cleanSymName.includes(cleanName) || cleanName.includes(cleanSymName))
+      ) {
+        confidence = cleanSymName === cleanName ? 1.0 : 0.95
+        break
+      }
+    }
+
     // 1. Exact symbol name in task or vice versa
-    if (cleanTask.includes(cleanSymName) || cleanSymName.includes(cleanTask)) {
+    if (
+      confidence === 0 &&
+      (cleanTask.includes(cleanSymName) || cleanSymName.includes(cleanTask))
+    ) {
       const isExactMatch = sym.name.toLowerCase() === task.trim().toLowerCase()
       const isSingleWordQuery = keywords.length === 1 && keywords[0] === cleanSymName
 
@@ -147,13 +207,13 @@ export function getDeterministicMatches(
       } else if (isSingleWordQuery) {
         confidence = 1.0
       } else {
-        const isOneOfManyKeywords = keywords.length > 1 && keywords.some((k) => cleanCasing(k) === cleanSymName)
+        const isOneOfManyKeywords =
+          keywords.length > 1 && keywords.some((k) => cleanCasing(k) === cleanSymName)
         confidence = isOneOfManyKeywords ? 0.8 : 0.9
       }
     }
 
     // 2. Compound keyword combination match
-    // E.g. task is "pipeline cache manager", we check if the symbol name matches every word.
     if (confidence === 0) {
       const rawWords = task
         .toLowerCase()
@@ -161,11 +221,21 @@ export function getDeterministicMatches(
         .filter((word) => word.length >= MIN_KEYWORD_LEN && !STOP_WORDS.has(word))
 
       if (rawWords.length > 1) {
-        const allGroupsMatched = rawWords.every((rw) => {
-          return cleanSymName.includes(cleanCasing(rw))
-        })
+        const allGroupsMatched = rawWords.every((rw) => cleanSymName.includes(cleanCasing(rw)))
         if (allGroupsMatched) {
           confidence = 0.98
+        }
+      }
+    }
+
+    // 3. Match against analysis file patterns (both file and symbol name must match)
+    if (confidence === 0 && analysis) {
+      const fileBasename = path.basename(sym.file, path.extname(sym.file)).toLowerCase()
+      for (const pattern of analysis.filePatterns) {
+        const cp = pattern.toLowerCase()
+        if (fileBasename.includes(cp) && cleanSymName.includes(cp)) {
+          confidence = 0.85
+          break
         }
       }
     }
