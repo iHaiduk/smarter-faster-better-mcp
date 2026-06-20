@@ -115,8 +115,8 @@ describe('Integration: runFindCodePipeline', () => {
     ]))
     const config: ScoutConfig = {
       baseUrl: 'http://localhost:1234/v1',
-      apiKey: 'test',
-      model: 'test',
+      apiKey: 'lm-studio',
+      model: 'gpt-oss-20b',
       llmTimeoutMs: 5000,
       llmParallelism: 1,
       parser: 'oxc',
@@ -136,8 +136,8 @@ describe('Integration: runExplainContextPack', () => {
     ]))
     const config: ScoutConfig = {
       baseUrl: 'http://localhost:1234/v1',
-      apiKey: 'test',
-      model: 'test',
+      apiKey: 'lm-studio',
+      model: 'gpt-oss-20b',
       llmTimeoutMs: 5000,
       llmParallelism: 1,
       parser: 'oxc',
