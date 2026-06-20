@@ -1,4 +1,4 @@
-import { describe, expect, test, afterEach } from 'bun:test'
+import { describe, expect, test, afterEach, beforeAll, afterAll } from 'bun:test'
 import { interceptFileRead, formatInterceptedMarkdown } from '../shared/filtering/interceptor.js'
 
 const originalFetch = global.fetch
@@ -14,6 +14,28 @@ function mockFetchFail(status: number) {
 }
 
 describe('File Content Interception & Filtering System', () => {
+  const savedEnv = {
+    SCOUT_BASE_URL: process.env['SCOUT_BASE_URL'],
+    SCOUT_API_KEY: process.env['SCOUT_API_KEY'],
+    SCOUT_MODEL: process.env['SCOUT_MODEL'],
+  }
+
+  beforeAll(() => {
+    process.env['SCOUT_BASE_URL'] = process.env['SCOUT_BASE_URL'] ?? 'http://localhost:11434/v1'
+    process.env['SCOUT_API_KEY'] = process.env['SCOUT_API_KEY'] ?? 'test-key'
+    process.env['SCOUT_MODEL'] = process.env['SCOUT_MODEL'] ?? 'test-model'
+  })
+
+  afterAll(() => {
+    for (const [key, val] of Object.entries(savedEnv)) {
+      if (val === undefined) {
+        delete process.env[key]
+      } else {
+        process.env[key] = val
+      }
+    }
+  })
+
   afterEach(() => {
     global.fetch = originalFetch
   })
