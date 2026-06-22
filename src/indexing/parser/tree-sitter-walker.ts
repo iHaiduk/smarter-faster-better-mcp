@@ -48,27 +48,31 @@ function extractDocFromTreeSitterNode(node: SyntaxNode): string {
 }
 
 /** Walks a tree-sitter subtree, collecting named symbol entries. */
-function walkForSymbols(node: SyntaxNode, relPath: string, out: SymbolEntry[]): void {
-  const kind = KIND_BY_NODE_TYPE.get(node.type)
-  if (kind) {
-    const nameNode = findTreeSitterNameNode(node)
-    if (nameNode) {
-      const fullText = node.text
-      const signature = (fullText.split('\n')[0] ?? '').trim().replace(/\s+/g, ' ').slice(0, 200)
-      out.push({
-        name: nameNode.text,
-        file: relPath,
-        line: node.startPosition.row + 1,
-        kind,
-        signature,
-        doc: extractDocFromTreeSitterNode(node),
-      })
+function walkForSymbols(rootNode: SyntaxNode, relPath: string, out: SymbolEntry[]): void {
+  const stack: SyntaxNode[] = [rootNode]
+  while (stack.length > 0) {
+    const node = stack.pop()!
+    const kind = KIND_BY_NODE_TYPE.get(node.type)
+    if (kind) {
+      const nameNode = findTreeSitterNameNode(node)
+      if (nameNode) {
+        const fullText = node.text
+        const signature = (fullText.split('\n')[0] ?? '').trim().replace(/\s+/g, ' ').slice(0, 200)
+        out.push({
+          name: nameNode.text,
+          file: relPath,
+          line: node.startPosition.row + 1,
+          kind,
+          signature,
+          doc: extractDocFromTreeSitterNode(node),
+        })
+      }
     }
-  }
 
-  for (let i = 0; i < node.childCount; i++) {
-    const child = node.child(i)
-    if (child) walkForSymbols(child, relPath, out)
+    for (let i = node.childCount - 1; i >= 0; i--) {
+      const child = node.child(i)
+      if (child) stack.push(child)
+    }
   }
 }
 

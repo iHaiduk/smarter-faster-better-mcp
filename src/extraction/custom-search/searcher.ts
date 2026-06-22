@@ -8,7 +8,7 @@ import { getProjectFiles } from '../../indexing/symbol-map/build-map.js'
 import { readMap } from '../../cache/map-cache.js'
 import { resolveBudget } from '../../shared/constants/budget.js'
 import { shouldIgnorePath } from '../../shared/constants/ignore-rules.js'
-import { globToRegex } from '../../shared/utils/glob.js'
+import { matchGlob } from '../../shared/utils/glob.js'
 
 import type { ContextBudgetOptions, ExtractedSymbol, LLMCandidate, ProjectMap } from '../../shared/types/index.js'
 
@@ -92,8 +92,7 @@ export async function runCustomSearch(
   const { maxFiles, maxSymbols, maxChars } = resolvedBudget
 
   const files = await getProjectFiles(targetRoot, getParserMode())
-  const globRegex = globToRegex(globPattern)
-  const matchedFiles = files.filter((f) => globRegex.test(f))
+  const matchedFiles = files.filter((f) => matchGlob(f, globPattern))
 
   const budgetedResults: ExtractedSymbol[] = []
   const uniqueFiles = new Set<string>()

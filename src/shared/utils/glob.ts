@@ -36,3 +36,22 @@ export function globToRegex(pattern: string): RegExp {
 }
 
 const globCache = new Map<string, RegExp>()
+
+/** Returns the basename of a forward-slash normalized path. */
+export const getBasename = (normalizedPath: string): string => {
+  const idx = normalizedPath.lastIndexOf('/')
+  return idx === -1 ? normalizedPath : normalizedPath.slice(idx + 1)
+}
+
+/** Matches a path against a glob pattern, supporting basename matching when pattern has no slashes. */
+export function matchGlob(filePath: string, pattern: string): boolean {
+  const normalizedPath = normalizePath(filePath)
+  const normalizedPattern = normalizePath(pattern)
+  const regex = globToRegex(normalizedPattern)
+  if (regex.test(normalizedPath)) return true
+  if (!normalizedPattern.includes('/')) {
+    const base = getBasename(normalizedPath)
+    if (regex.test(base)) return true
+  }
+  return false
+}

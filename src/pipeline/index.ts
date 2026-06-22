@@ -1,15 +1,16 @@
+import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
 
 import { isCacheStale } from '../cache/l1.js'
 import { extractWithOxc } from '../extraction/extract.js'
-import { filterMap, getDeterministicMatches } from '../extraction/matcher/filter.js'
+import { filterMap, getDeterministicMatches, extractCodeIdentifiers } from '../extraction/matcher/filter.js'
 import {
   formatFound,
   formatNotFound,
   serializeForLLM,
   toStructuredJSON,
 } from '../bundle/formatter/format.js'
-import { getGitStatusMap, getGitHint } from '../shared/utils/git.js'
+import { getGitStatusMap, getGitHint, getFileWorktreeStatuses } from '../shared/utils/git.js'
 import { askCheapLLM } from '../extraction/llm.js'
 import { findDeps } from '../dependency-resolver/deps.js'
 import { buildMap } from '../indexing/symbol-map/build-map.js'
@@ -20,13 +21,14 @@ import { parseCustomQuery, runCustomSearch } from '../extraction/custom-search/s
 import { analyzeQuery } from '../extraction/query-analyzer.js'
 import { validateExtractedSymbols } from '../extraction/content-validator.js'
 import { readMap, lookupCached, storeCached, chunkSymbols } from '../cache/map-cache.js'
-import { interceptFileRead, formatInterceptedMarkdown } from '../shared/filtering/interceptor.js'
 import { resolveSecurePath } from './resolve-path.js'
+import { filesystemSymbolSearch } from './fs-search.js'
 
 import type {
   ExtractedSymbol,
   LLMCandidate,
   ProjectMap,
+  QueryAnalysis,
   ScoutConfig,
   ContextBudgetOptions,
   RelevanceTier,
@@ -110,6 +112,19 @@ export async function runFindCodePipeline(
     .filter((c) => knownSymbols.has(`${c.file}\0${c.symbol}`))
     .toSorted((a, b) => b.confidence - a.confidence)
 
+  // Filesystem fallback: trigger when no candidates found OR when best candidate
+  // has very low relevance (LLM returned irrelevant files).
+  const bestConfidence = validatedCandidates[0]?.confidence ?? 0
+  const needsFallback = validatedCandidates.length === 0 || bestConfidence < 0.5
+
+  if (needsFallback) {
+    const fallbackResult = await tryFilesystemFallback(task, analysis, targetRoot, {
+      summaryOnly, includeTests, maxFiles, maxSymbols, maxChars,
+    })
+    if (fallbackResult) return fallbackResult
+  }
+
+  // Only return NOT_FOUND if there were truly no candidates at all
   if (validatedCandidates.length === 0) {
     const markdown = formatNotFound(task, map.symbolsCount)
     return toStructuredJSON(markdown, [], 0, 'No matching symbols found.', [], [], map)
@@ -156,6 +171,11 @@ export async function runFindCodePipeline(
   const gitStatusMap = await getGitStatusMap(targetRoot)
   const mainMarkdown = formatFound(validatedSymbols, gitStatusMap)
 
+  // Check for stale index (files changed since last build)
+  const resultFiles = [...new Set(validatedSymbols.map((s) => s.candidate.file))]
+  const worktreeStatuses = await getFileWorktreeStatuses(resultFiles, targetRoot, map.generatedAt)
+  const hasStaleIndex = worktreeStatuses.some((s) => !s.indexFresh)
+
   const reason = isDeterministic
     ? 'Identified via high-confidence deterministic naming preflight.'
     : 'Identified via LLM-assisted context extraction.'
@@ -163,6 +183,10 @@ export async function runFindCodePipeline(
   const missingContextHints = budgetedResults.omittedCount > 0
     ? [`Omitted ${budgetedResults.omittedCount} lower-priority symbols because of context budget limits.`]
     : []
+
+  if (hasStaleIndex) {
+    missingContextHints.push('Some files have changed since the last index build. Results may be incomplete.')
+  }
 
   const followUpQueries = validatedSymbols
     .filter((r) => r.relevanceTier === 'mustRead')
@@ -176,6 +200,8 @@ export async function runFindCodePipeline(
     missingContextHints,
     followUpQueries,
     map,
+    undefined,
+    hasStaleIndex,
   )
 }
 
@@ -290,13 +316,13 @@ export async function runTraceSymbolPipeline(
   )
 }
 
-/** Securely reads context of a specific file range. */
+/** Securely reads context of a specific file range with auto-expanded imports and related types. */
 export async function runGetFileContext(
   fileRelPath: string,
   startLine?: number,
   endLine?: number,
   targetRoot = process.cwd(),
-  query?: string,
+  _query?: string,
 ): Promise<string> {
   const map = await readMap(targetRoot).catch(() => undefined)
   const resolved = await resolveSecurePath(fileRelPath, targetRoot)
@@ -312,39 +338,178 @@ export async function runGetFileContext(
 
   const slicedContent = lines.slice(sLine - 1, eLine).join('\n')
 
-  // We bypass the LLM filter for get_file_context. Large models are better at reading raw code directly.
-  // The LLM filter uses extra tokens for explanations and might mistakenly filter out critical details.
+  const sections: string[] = []
   const ext = fileRelPath.split('.').pop() || 'text'
-  const markdown = [
-    `### 📄 File Context: ${fileRelPath} (L${sLine}-${eLine})`,
-    `\`\`\`${ext}`,
-    slicedContent,
-    `\`\`\``
-  ].join('\n')
 
-  const mockCandidate: LLMCandidate = { file: fileRelPath, symbol: FILE_CONTEXT_SYMBOL, confidence: 1.0 }
-  const mockExtracted: ExtractedSymbol = {
-    candidate: mockCandidate,
-    code: slicedContent,
-    signature: '',
-    doc: '',
-    imports: [],
-    importedBy: [],
-    extractionOk: true,
-    startLine: sLine,
-    endLine: eLine,
-    relevanceTier: 'mustRead',
+  // Include imports when the slice starts after them and they are short enough (max 30 lines).
+  const importsEnd = sLine > 1 ? findImportsEnd(lines) : 0
+  if (importsEnd > 0 && importsEnd < sLine && importsEnd <= 30) {
+    const importsSection = lines.slice(0, importsEnd).join('\n')
+    sections.push(`### Imports (L1-${importsEnd})`)
+    sections.push(`\`\`\`${ext}`)
+    sections.push(importsSection)
+    sections.push('```')
+    sections.push('')
   }
 
+  sections.push(`### File Context: ${fileRelPath} (L${sLine}-${eLine})`)
+  sections.push(`\`\`\`${ext}`)
+  sections.push(slicedContent)
+  sections.push('```')
+
+  // Include related types referenced in the code (max 2, max 10 lines each).
+  if (!map) {
+    const markdown = sections.join('\n')
+    return toStructuredJSON(markdown, [makeFileContextExtracted(fileRelPath, slicedContent, sLine, eLine, map)], 1.0, 'Direct file context provided.', [], [], map)
+  }
+
+  const relatedTypes = findRelatedTypesInCode(slicedContent, map, fileRelPath)
+  for (const typeSym of relatedTypes.slice(0, 2)) {
+    const typeSlice = await readTypeSlice(targetRoot, typeSym)
+    if (typeSlice) {
+      sections.push('')
+      sections.push(`#### ${typeSym.name} (${typeSym.file}:${typeSym.line})`)
+      sections.push(`\`\`\`${ext}`)
+      sections.push(typeSlice)
+      sections.push('```')
+    }
+  }
+
+  const markdown = sections.join('\n')
+  return toStructuredJSON(markdown, [makeFileContextExtracted(fileRelPath, slicedContent, sLine, eLine, map)], 1.0, 'Direct file context provided with imports and related types.', [], [], map)
+}
+
+/**
+ * Finds the end line of the imports section in a file.
+ * Returns 0 if no imports section is found.
+ */
+function findImportsEnd(lines: string[]): number {
+  let lastImportLine = 0
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]!.trim()
+    // Match import statements
+    if (line.startsWith('import ') || line.startsWith('import{') || line.startsWith('import type ')) {
+      lastImportLine = i + 1
+    }
+    // Stop searching after a non-import, non-empty, non-comment line
+    // that comes after at least one import
+    if (lastImportLine > 0 && line && !line.startsWith('//') && !line.startsWith('/*') && !line.startsWith('*') && !line.startsWith('import ')) {
+      break
+    }
+  }
+  return lastImportLine
+}
+
+function makeFileContextExtracted(
+  file: string,
+  code: string,
+  startLine: number,
+  endLine: number,
+  map: ProjectMap | undefined,
+): ExtractedSymbol {
+  return {
+    candidate: { file, symbol: FILE_CONTEXT_SYMBOL, confidence: 1.0 },
+    code,
+    signature: '',
+    doc: '',
+    imports: map?.files?.find((f) => f.file === file)?.imports.map((i) => i.source) ?? [],
+    importedBy: [],
+    extractionOk: true,
+    startLine,
+    endLine,
+    relevanceTier: 'mustRead',
+  }
+}
+
+async function readTypeSlice(
+  targetRoot: string,
+  typeSym: { name: string; file: string; line: number },
+): Promise<string | null> {
+  try {
+    const typeContent = await fs.readFile(path.join(targetRoot, typeSym.file), 'utf8')
+    const typeLines = typeContent.split('\n')
+    const start = Math.max(0, typeSym.line - 1)
+    const end = Math.min(typeLines.length, start + 10)
+    return typeLines.slice(start, end).join('\n')
+  } catch {
+    return null
+  }
+}
+
+interface FallbackBudget {
+  readonly summaryOnly: boolean
+  readonly includeTests: boolean
+  readonly maxFiles: number
+  readonly maxSymbols: number
+  readonly maxChars: number
+}
+
+async function tryFilesystemFallback(
+  task: string,
+  analysis: QueryAnalysis | null | undefined,
+  targetRoot: string,
+  budget: FallbackBudget,
+): Promise<string | null> {
+  const exactIdentifiers = extractCodeIdentifiers(task)
+  const analysisSymbols = analysis?.symbolNames ?? []
+  const allSymbolNames = [...new Set([...exactIdentifiers, ...analysisSymbols])]
+  if (allSymbolNames.length === 0) return null
+
+  console.error(`[Scout] Weak matches. Trying filesystem fallback for: ${allSymbolNames.join(', ')}`)
+  const fsMatches = await filesystemSymbolSearch(allSymbolNames, targetRoot)
+  if (fsMatches.length === 0) return null
+
+  console.error(`[Scout] Filesystem fallback found ${fsMatches.length} symbols. Rebuilding index...`)
+  await buildMap(targetRoot)
+  const freshMap = await readMap(targetRoot)
+
+  const freshCandidates = getDeterministicMatches(freshMap, task, budget.includeTests, analysis)
+  const freshValidated = freshCandidates.filter((c) => c.confidence >= 0.8)
+  if (freshValidated.length === 0) return null
+
+  console.error(`[Scout] Fresh index matched ${freshValidated.length} candidates after rebuild.`)
+  const freshRanked = freshValidated.map((c) => ({
+    candidate: c,
+    tier: (c.confidence >= 0.95 ? 'mustRead' : 'likelyRelevant') as RelevanceTier,
+  }))
+
+  const budgetedResults = await applyBudget(freshRanked, budget.summaryOnly, freshMap, targetRoot, budget.maxFiles, budget.maxSymbols, budget.maxChars)
+  const gitStatusMap = await getGitStatusMap(targetRoot)
+  const mainMarkdown = formatFound(budgetedResults.symbols, gitStatusMap)
+
   return toStructuredJSON(
-    markdown,
-    [mockExtracted],
-    1.0,
-    `Direct file context provided.`,
-    [],
-    [],
-    map,
+    mainMarkdown,
+    budgetedResults.symbols,
+    budgetedResults.symbols[0]?.candidate.confidence ?? 1.0,
+    `Found via filesystem fallback and index rebuild. Symbols: ${allSymbolNames.join(', ')}`,
+    [`Index was stale — symbols found on disk but not in cached map. Index has been rebuilt.`],
+    budgetedResults.symbols.map((r) => `trace_symbol: ${r.candidate.symbol}`),
+    freshMap,
   )
+}
+
+/**
+ * Finds type definitions (interfaces/type aliases) referenced in the given code snippet.
+ * Returns symbol entries for definitions found in the project map.
+ */
+function findRelatedTypesInCode(
+  code: string,
+  map: ProjectMap,
+  excludeFile: string,
+): readonly { name: string; file: string; line: number }[] {
+  const codeWords = new Set(code.split(/[\s\W_]+/).filter((w) => w.length > 2))
+  const results: { name: string; file: string; line: number }[] = []
+
+  for (const sym of map.symbols) {
+    if (results.length >= 2) break
+    if (sym.file === excludeFile) continue
+    if (sym.kind !== 'TSInterfaceDeclaration' && sym.kind !== 'TSTypeAliasDeclaration') continue
+    if (codeWords.has(sym.name)) {
+      results.push({ name: sym.name, file: sym.file, line: sym.line })
+    }
+  }
+
+  return results
 }
 
 /** Generates a high-level summary outline pack for planning. */

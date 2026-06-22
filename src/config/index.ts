@@ -5,7 +5,7 @@ import type { ParserMode, ProjectMap, ScoutConfig } from '../shared/types/index.
 import { MissingConfigError, InvalidParserModeError } from '../shared/errors/config-errors.js'
 
 export { MissingConfigError, InvalidParserModeError } from '../shared/errors/config-errors.js'
-export { STOP_WORDS } from '../shared/prompts/stop-words.js'
+export { STOP_WORDS, CODE_MEANINGFUL_WORDS } from '../shared/prompts/stop-words.js'
 export { SYSTEM_PROMPT } from '../shared/prompts/system-prompt.js'
 export { getSourceExtensions } from '../shared/constants/extensions.js'
 

@@ -1,3 +1,6 @@
+import * as fs from 'node:fs/promises'
+import * as path from 'node:path'
+
 import { getParserMode, getSourceExtensions } from '../../config/index.js'
 import { runCommand } from './node.js'
 
@@ -37,4 +40,65 @@ export async function getGitStatusMap(targetRoot = process.cwd()): Promise<Map<s
   } catch {
     return new Map()
   }
+}
+
+/** Worktree status type for a single file. */
+export interface FileWorktreeStatus {
+  readonly file: string
+  readonly gitStatus: 'tracked' | 'staged' | 'modified' | 'untracked' | 'deleted'
+  readonly indexFresh: boolean
+  readonly source: 'index' | 'live-filesystem'
+}
+
+/**
+ * Gets detailed worktree status for a list of files.
+ * Shows whether each file is tracked, modified, staged, or untracked,
+ * and whether the index data is fresh or stale.
+ */
+export async function getFileWorktreeStatuses(
+  files: readonly string[],
+  targetRoot = process.cwd(),
+  mapGeneratedAt?: number,
+): Promise<readonly FileWorktreeStatus[]> {
+  const statusMap = await getGitStatusMap(targetRoot)
+  const results: FileWorktreeStatus[] = []
+
+  for (const file of files) {
+    const gitStatus = statusMap.get(file) ?? ''
+
+    let status: FileWorktreeStatus['gitStatus']
+    if (gitStatus === '??') {
+      status = 'untracked'
+    } else if (gitStatus === 'M' || gitStatus === 'MM') {
+      status = 'modified'
+    } else if (gitStatus === 'A') {
+      status = 'staged'
+    } else if (gitStatus === 'D') {
+      status = 'deleted'
+    } else {
+      status = 'tracked'
+    }
+
+    let indexFresh = true
+    let source: FileWorktreeStatus['source'] = 'index'
+
+    if (mapGeneratedAt && status !== 'untracked') {
+      try {
+        const stat = await fs.stat(path.join(targetRoot, file))
+        if (stat.mtimeMs > mapGeneratedAt) {
+          indexFresh = false
+          source = 'live-filesystem'
+        }
+      } catch {
+        // File might not exist or be inaccessible
+      }
+    } else if (status === 'untracked') {
+      indexFresh = false
+      source = 'live-filesystem'
+    }
+
+    results.push({ file, gitStatus: status, indexFresh, source })
+  }
+
+  return results
 }

@@ -5,7 +5,7 @@ import type { ExtractedSymbol, QueryAnalysis, ScoutConfig } from '../shared/type
 
 const DET_RELEVANCE_THRESHOLD = 0.15
 const KEEP_THRESHOLD = 0.5
-const MAX_BORDERLINE_FOR_LLM = 15
+const MAX_BORDERLINE_FOR_LLM = 10
 const MAX_LLM_OUTPUT_TOKENS = 300
 const MAX_LLM_TIMEOUT_MS = 8_000
 

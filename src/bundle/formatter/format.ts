@@ -68,13 +68,14 @@ export function formatFound(
 export function formatNotFound(task: string, symbolsCount: number): string {
   return [
     '[Scout: NOT_FOUND]',
-    `No code found for: "${task}"`,
+    `No indexed symbols matched: "${task}"`,
     '',
-    'This feature does not exist in the project yet.',
-    'Proceed with implementation according to your plan.',
+    'The symbol was not found in the current project map.',
+    'The index may be stale or may not include recently added/modified files.',
+    'Recommendation: verify with filesystem search (grep/rg) before creating new code to avoid duplication.',
     symbolsCount > 0
-      ? `Project has ${symbolsCount} symbols — none matched.`
-      : 'Project map is empty — this appears to be a new project.',
+      ? `Project has ${symbolsCount} indexed symbols — none matched.`
+      : 'Project map is empty — consider running refresh_map.',
   ].join('\n')
 }
 
@@ -175,6 +176,8 @@ export function toStructuredJSON(
   missingContextHints: readonly string[] = [],
   followUpQueries: readonly string[] = [],
   map?: ProjectMap,
+  worktreeStatus?: string,
+  staleIndexWarning?: boolean,
 ): string {
   const cleanReason = reason.includes('preflight') ? 'deterministic' : reason.includes('LLM') ? 'llm' : reason
   const depsString = buildDepsString(extractions, map)
@@ -191,6 +194,8 @@ export function toStructuredJSON(
           .slice(0, MAX_FOLLOW_UP_QUERIES)
           .join(',')
       : undefined,
+    worktreeStatus,
+    staleIndexWarning,
   }
 
   return JSON.stringify({ markdown, structuredContent: structured })

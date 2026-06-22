@@ -1,4 +1,4 @@
-import { describe, expect, test, mock } from 'bun:test'
+import { describe, expect, test, mock, beforeEach } from 'bun:test'
 
 const mockConfig = {
   baseUrl: 'http://localhost:1234/v1',
@@ -21,6 +21,10 @@ function mockFetchResponse(content: string) {
 }
 
 describe('analyzeQuery', () => {
+  beforeEach(async () => {
+    const { clearQueryCache } = await import('../cache/query-cache.js')
+    clearQueryCache()
+  })
   test('parses specificSymbol intent from LLM response', async () => {
     const originalFetch = mockFetchResponse(
       JSON.stringify({

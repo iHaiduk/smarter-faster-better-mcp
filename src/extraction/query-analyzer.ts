@@ -1,5 +1,6 @@
 import { cleanJSON } from '../shared/utils/json.js'
 import { llmFetch } from '../shared/utils/llm-client.js'
+import { getCachedAnalysis, setCachedAnalysis } from '../cache/query-cache.js'
 
 import type { QueryAnalysis, QueryIntent, ScoutConfig } from '../shared/types/index.js'
 
@@ -43,6 +44,7 @@ const toStringArray = (val: unknown): string[] =>
  * structured search information: intent, symbol names, expanded terms, file patterns.
  *
  * Returns null on failure so the pipeline can fall back to keyword-based search.
+ * Results are cached to avoid repeated LLM calls for similar queries.
  */
 export async function analyzeQuery(
   task: string,
@@ -50,6 +52,12 @@ export async function analyzeQuery(
 ): Promise<QueryAnalysis | null> {
   if (task.length < 5) return null
   if (/^[a-zA-Z_]\w+$/.test(task.trim())) return null
+
+  const cached = getCachedAnalysis(task)
+  if (cached) {
+    console.error('[Scout] Query analysis: cache hit')
+    return cached
+  }
 
   const raw = await llmFetch(
     config.baseUrl,
@@ -77,11 +85,14 @@ export async function analyzeQuery(
     symbolNames = task.match(/\b(use[A-Z]\w*|[A-Z][a-z]+[A-Z]\w*|[a-z]+_[a-z]+_\w+)\b/g) ?? []
   }
 
-  return {
+  const analysis: QueryAnalysis = {
     intent,
     symbolNames,
     expandedTerms: toStringArray(parsed['expandedTerms']),
     filePatterns: toStringArray(parsed['filePatterns']),
     description: typeof parsed['description'] === 'string' ? parsed['description'] : task,
   }
+
+  setCachedAnalysis(task, analysis)
+  return analysis
 }

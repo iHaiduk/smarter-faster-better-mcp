@@ -1,44 +1,79 @@
 import type { ProjectMap } from '../shared/types/index.js'
 
-const MAX_DEP_FILES = 5
+const MAX_DIRECT_IMPORTERS = 20
+const MAX_TRANSITIVE_DEPTH = 3
 
 /**
- * Finds up to 5 files referencing `symbolName` from `sourceFile` by traversing
+ * Structured dependency result containing categorized dependency information.
+ */
+export interface DependencyResult {
+  readonly directImporters: readonly string[]
+  readonly reExporters: readonly string[]
+  readonly barrelChain: readonly string[]
+  readonly allFiles: readonly string[]
+}
+
+/**
+ * Finds files referencing `symbolName` from `sourceFile` by traversing
  * the project's parsed AST import/export graph.
+ *
+ * Returns structured dependency information:
+ * - directImporters: files that directly import the symbol
+ * - reExporters: files that re-export the symbol (barrel exports)
+ * - barrelChain: chain of barrel files leading to the symbol
+ * - allFiles: deduplicated list of all dependent files
  */
 export async function findDeps(
   symbolName: string,
   sourceFile: string,
   map?: ProjectMap,
 ): Promise<string[]> {
+  const result = findDepsStructured(symbolName, sourceFile, map)
+  return [...result.allFiles]
+}
+
+/**
+ * Extended version of findDeps that returns structured dependency information.
+ * Tracks direct imports, re-exports, and barrel chains separately.
+ */
+export function findDepsStructured(
+  symbolName: string,
+  sourceFile: string,
+  map?: ProjectMap,
+): DependencyResult {
   if (!map || !map.files) {
-    return []
+    return { directImporters: [], reExporters: [], barrelChain: [], allFiles: [] }
   }
 
+  const directImporters = new Set<string>()
+  const reExporters = new Set<string>()
+  const barrelChain: string[] = []
   const seenImporters = new Set<string>()
-  const queue: { file: string; symbol: string }[] = [{ file: sourceFile, symbol: symbolName }]
+  const queue: { file: string; symbol: string; depth: number }[] = [{ file: sourceFile, symbol: symbolName, depth: 0 }]
   const processed = new Set<string>()
 
-  while (queue.length > 0 && seenImporters.size < MAX_DEP_FILES) {
+  while (queue.length > 0) {
     const current = queue.shift()!
     const key = `${current.file}::${current.symbol}`
     if (processed.has(key)) continue
     processed.add(key)
 
-    for (const fMeta of map.files) {
-      if (seenImporters.size >= MAX_DEP_FILES) break
+    // Stop transitive traversal at max depth
+    if (current.depth >= MAX_TRANSITIVE_DEPTH) continue
 
+    for (const fMeta of map.files) {
       // 1. Direct Imports
       for (const imp of fMeta.imports) {
         if (imp.resolved === current.file) {
-          // Check if it imports our symbol
           const spec = imp.specifiers.find(
             (s) => s.imported === current.symbol || s.imported === '*',
           )
           if (spec) {
+            if (current.depth === 0) {
+              directImporters.add(fMeta.file)
+            }
             seenImporters.add(fMeta.file)
-            // Recursively trace if they import it under a local name
-            queue.push({ file: fMeta.file, symbol: spec.local })
+            queue.push({ file: fMeta.file, symbol: spec.local, depth: current.depth + 1 })
           }
         }
       }
@@ -48,13 +83,21 @@ export async function findDeps(
         if (reExp.resolved === current.file) {
           if (reExp.specifiers.length === 0) {
             // Wildcard export * from './module'
-            // This re-exports current.symbol under the same name
-            queue.push({ file: fMeta.file, symbol: current.symbol })
+            if (current.depth === 0) {
+              reExporters.add(fMeta.file)
+              barrelChain.push(fMeta.file)
+            }
+            seenImporters.add(fMeta.file)
+            queue.push({ file: fMeta.file, symbol: current.symbol, depth: current.depth + 1 })
           } else {
-            // Named re-export e.g. export { x as y } from './module'
             const spec = reExp.specifiers.find((s) => s.imported === current.symbol)
             if (spec) {
-              queue.push({ file: fMeta.file, symbol: spec.local })
+              if (current.depth === 0) {
+                reExporters.add(fMeta.file)
+                barrelChain.push(fMeta.file)
+              }
+              seenImporters.add(fMeta.file)
+              queue.push({ file: fMeta.file, symbol: spec.local, depth: current.depth + 1 })
             }
           }
         }
@@ -63,5 +106,12 @@ export async function findDeps(
   }
 
   seenImporters.delete(sourceFile)
-  return [...seenImporters].slice(0, MAX_DEP_FILES)
+  const allFiles: string[] = [...seenImporters].slice(0, MAX_DIRECT_IMPORTERS)
+
+  return {
+    directImporters: [...directImporters],
+    reExporters: [...reExporters],
+    barrelChain,
+    allFiles,
+  }
 }

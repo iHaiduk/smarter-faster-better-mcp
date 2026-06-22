@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import { extractWithOxc } from '../extraction/extract.js'
 import { filterMap, getDeterministicMatches } from '../extraction/matcher/filter.js'
 import { findDeps } from '../dependency-resolver/deps.js'
-import { globToRegex, normalizePath } from '../shared/utils/glob.js'
+import { globToRegex, matchGlob, normalizePath } from '../shared/utils/glob.js'
 import { buildEndpoint } from '../shared/utils/llm-client.js'
 import { cleanJSON } from '../shared/utils/json.js'
 import { shouldIgnorePath } from '../shared/constants/ignore-rules.js'
@@ -104,6 +104,15 @@ describe('Integration: Shared Utilities', () => {
     expect(regex.test('src/index.ts')).toBe(true)
     expect(regex.test('src/utils/helper.ts')).toBe(true)
     expect(regex.test('lib/index.ts')).toBe(false)
+  })
+
+  test('matchGlob supports matchBase (no slashes in pattern matches basename recursively)', () => {
+    expect(matchGlob('src/utils/helper.ts', '*.ts')).toBe(true)
+    expect(matchGlob('src/components/chat/ChatBubble.tsx', '*chat*')).toBe(true)
+    expect(matchGlob('chat.ts', '*chat*')).toBe(true)
+    expect(matchGlob('src/chat/foo.ts', 'foo.ts')).toBe(true)
+    expect(matchGlob('src/chat/foo.ts', 'src/*.ts')).toBe(false) // has slash, so direct match only
+    expect(matchGlob('src/foo.ts', 'src/*.ts')).toBe(true)
   })
 
   test('normalizePath converts backslashes', () => {

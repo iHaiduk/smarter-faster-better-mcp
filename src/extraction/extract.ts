@@ -123,15 +123,16 @@ function collapseTreeSitterBody(node: SyntaxNode, source: string): string {
 
 /** Searches a tree-sitter subtree for a node declaring `symbolName`. Returns null if not found. */
 function findSymbolNode(root: SyntaxNode, symbolName: string): SyntaxNode | null {
-  if (TREE_SITTER_WALKABLE_KINDS.has(root.type)) {
-    const nameNode = findTreeSitterNameNode(root)
-    if (nameNode?.text === symbolName) return root
-  }
-  for (let i = 0; i < root.childCount; i++) {
-    const child = root.child(i)
-    if (child) {
-      const found = findSymbolNode(child, symbolName)
-      if (found) return found
+  const stack: SyntaxNode[] = [root]
+  while (stack.length > 0) {
+    const node = stack.pop()!
+    if (TREE_SITTER_WALKABLE_KINDS.has(node.type)) {
+      const nameNode = findTreeSitterNameNode(node)
+      if (nameNode?.text === symbolName) return node
+    }
+    for (let i = node.childCount - 1; i >= 0; i--) {
+      const child = node.child(i)
+      if (child) stack.push(child)
     }
   }
   return null

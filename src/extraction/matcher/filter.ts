@@ -9,6 +9,12 @@ const FUZZY_MIN_WORD_LEN = 4
 const FUZZY_MAX_DISTANCE = 1
 const BIGRAM_MIN_DICE = 0.4
 
+/**
+ * Regex for extracting likely code identifiers from a natural language query.
+ * Matches camelCase, PascalCase, and snake_case identifiers.
+ */
+const CODE_IDENTIFIER_RE = /\b([a-z][a-zA-Z0-9]*[A-Z][a-zA-Z0-9]*|[A-Z][a-z]+[A-Z][a-zA-Z0-9]*|[a-z]+_[a-z]+_[a-z]+)\b/g
+
 /** Classic two-row Levenshtein. Returns the edit distance between `a` and `b`. */
 export function getEditDistance(a: string, b: string): number {
   if (a === b) return 0
@@ -65,15 +71,52 @@ export function prepareKeywords(task: string): KeywordSpec[] {
   }))
 }
 
-function scoreSymbol(sym: SymbolEntry, keywords: readonly KeywordSpec[]): number {
+/** Extracts likely code identifiers (camelCase/PascalCase/snake_case) from a query. */
+export function extractCodeIdentifiers(task: string): string[] {
+  const matches = task.match(CODE_IDENTIFIER_RE) ?? []
+  // Also extract any word that looks like a symbol (contains uppercase after lowercase)
+  const additional = task.split(/[\s,;.!?()[\]{}]+/).filter((word) => {
+    if (word.length < 3) return false
+    // camelCase or PascalCase
+    if (/^[a-z][a-zA-Z0-9]*[A-Z]/.test(word)) return true
+    if (/^[A-Z][a-z]+[A-Z]/.test(word)) return true
+    // snake_case with at least 2 underscores
+    if (/^[a-z]+_[a-z]+/.test(word)) return true
+    return false
+  })
+  return [...new Set([...matches, ...additional])]
+}
+
+/** Scoring weights for different match types. */
+const SCORE_EXACT_NAME = 100
+const SCORE_CONTAINS_NAME = 50
+const SCORE_EXACT_KEYWORD = 10
+const SCORE_FUZZY_KEYWORD = 3
+const SCORE_FILE_MATCH = 2
+
+function scoreSymbol(sym: SymbolEntry, keywords: readonly KeywordSpec[], exactIdentifiers: readonly string[]): number {
+  const symLower = sym.name.toLowerCase()
+
+  // Highest priority: exact identifier match from query
+  for (const ident of exactIdentifiers) {
+    const identLower = ident.toLowerCase()
+    if (symLower === identLower) return SCORE_EXACT_NAME
+    if (symLower.includes(identLower) || identLower.includes(symLower)) return SCORE_CONTAINS_NAME
+  }
+
   const hay = `${sym.name} ${sym.file} ${sym.doc} ${sym.signature}`.toLowerCase()
 
   let score = 0
   let hayWords: string[] | null = null
 
   for (const kw of keywords) {
+    // Exact keyword match in symbol name gets higher weight
+    if (symLower.includes(kw.word)) {
+      score += SCORE_EXACT_KEYWORD
+      continue
+    }
     if (hay.includes(kw.word)) {
-      score += 2
+      score += SCORE_FUZZY_KEYWORD
       continue
     }
     if (!kw.fuzzy) continue
@@ -85,8 +128,18 @@ function scoreSymbol(sym: SymbolEntry, keywords: readonly KeywordSpec[]): number
       if (diceCoefficient(kw.grams, grams) < BIGRAM_MIN_DICE) return false
       return getEditDistance(kw.word, hayWord) <= FUZZY_MAX_DISTANCE
     })
-    if (matched) score += 1
+    if (matched) score += SCORE_FUZZY_KEYWORD
   }
+
+  // File name match bonus
+  const fileBasename = path.basename(sym.file, path.extname(sym.file)).toLowerCase()
+  for (const kw of keywords) {
+    if (fileBasename.includes(kw.word)) {
+      score += SCORE_FILE_MATCH
+      break
+    }
+  }
+
   return score
 }
 
@@ -101,6 +154,7 @@ export function filterMap(
   analysis?: QueryAnalysis | null,
 ): SymbolEntry[] {
   const keywords = prepareKeywords(task)
+  const exactIdentifiers = extractCodeIdentifiers(task)
 
   // Build additional keywords from analysis expanded terms
   const expandedKeywords: KeywordSpec[] = analysis
@@ -111,27 +165,30 @@ export function filterMap(
   const symbolNames = analysis?.symbolNames ?? []
 
   const allKeywords = [...keywords, ...expandedKeywords]
-  if (allKeywords.length === 0 && filePatterns.length === 0 && symbolNames.length === 0) {
+  const allExactIds = [...exactIdentifiers, ...symbolNames]
+  if (allKeywords.length === 0 && filePatterns.length === 0 && allExactIds.length === 0) {
     return map.symbols.slice(0, MAX_SYMBOLS_FOR_LLM)
   }
 
   const scored = map.symbols
     .map((sym) => {
-      let score = scoreSymbol(sym, allKeywords)
+      let score = scoreSymbol(sym, allKeywords, allExactIds)
 
       // Boost for symbols whose names match analysis-extracted symbol names
       for (const name of symbolNames) {
         const cleanName = name.toLowerCase()
         const cleanSym = sym.name.toLowerCase()
-        if (cleanSym.includes(cleanName) || cleanName.includes(cleanSym)) {
-          score += 3
+        if (cleanSym === cleanName) {
+          score += 50
+        } else if (cleanSym.includes(cleanName) || cleanName.includes(cleanSym)) {
+          score += 20
         }
       }
 
       // Boost for symbols in files matching analysis file patterns
       for (const pattern of filePatterns) {
         if (sym.file.toLowerCase().includes(pattern.toLowerCase())) {
-          score += 1
+          score += 2
         }
       }
 
@@ -167,7 +224,11 @@ export function getDeterministicMatches(
   const keywords = prepareKeywords(task).map((k) => k.word)
   const analysisSymbolNames = analysis?.symbolNames ?? []
 
-  if (keywords.length === 0 && analysisSymbolNames.length === 0) return []
+  // Extract exact code identifiers from the query (camelCase, PascalCase, snake_case)
+  const exactIdentifiers = extractCodeIdentifiers(task)
+  const allExactNames = [...new Set([...exactIdentifiers, ...analysisSymbolNames])]
+
+  if (keywords.length === 0 && allExactNames.length === 0) return []
 
   const cleanTask = cleanCasing(task)
   const candidates: LLMCandidate[] = []
@@ -180,14 +241,19 @@ export function getDeterministicMatches(
     const cleanSymName = cleanCasing(sym.name)
     let confidence = 0
 
-    // 0. Match against analysis-extracted symbol names (highest priority)
-    for (const name of analysisSymbolNames) {
+    // 0. Exact identifier match from query — highest priority
+    // This is the primary fix for "can't find exact symbols" problem.
+    // When the query contains a camelCase/PascalCase/snake_case identifier,
+    // we check it against symbol names first, before any fuzzy matching.
+    for (const name of allExactNames) {
       const cleanName = cleanCasing(name)
-      if (
-        cleanName.length >= 3 &&
-        (cleanSymName === cleanName || cleanSymName.includes(cleanName) || cleanName.includes(cleanSymName))
-      ) {
-        confidence = cleanSymName === cleanName ? 1.0 : 0.95
+      if (cleanName.length < 3) continue
+      if (cleanSymName === cleanName) {
+        confidence = 1.0
+        break
+      }
+      if (cleanSymName.includes(cleanName) || cleanName.includes(cleanSymName)) {
+        confidence = 0.95
         break
       }
     }

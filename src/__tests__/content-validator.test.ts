@@ -66,6 +66,10 @@ describe('validateExtractedSymbols', () => {
   test('keeps all symbols when query terms match their code', async () => {
     const { validateExtractedSymbols } = await import('../extraction/content-validator.js')
 
+    mockFetchLlm([
+      { idx: 0, relevant: true, reason: 'matches' },
+    ])
+
     const symbols = [
       makeSymbol('src/hooks/useOnline.ts', 'useOnline', 'export function useOnline() { const [online, setOnline] = useState(false) }'),
       makeSymbol('src/types/status.ts', 'Status', 'export type Status = "online" | "offline"'),

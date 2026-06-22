@@ -39,7 +39,15 @@ function findNameArgs(extensions: ReadonlySet<string>): string[] {
   })
 }
 
-/** Returns true when any tracked file is newer than the cached project map. */
+/**
+ * Returns true when the project map should be considered stale.
+ *
+ * Checks (in order):
+ * 1. Map file doesn't exist or has wrong parser mode
+ * 2. Git worktree has uncommitted changes (modified, staged, or untracked files)
+ * 3. Any tracked source file is newer than the map file
+ * 4. Fallback: map file is older than 5 minutes
+ */
 export async function isCacheStale(targetRoot: string): Promise<boolean> {
   const mapPath = getMapFilePath(targetRoot)
   if (!(await fileExists(mapPath))) return true
@@ -50,6 +58,18 @@ export async function isCacheStale(targetRoot: string): Promise<boolean> {
     if (!projectMapMatchesParserMode(map, parserMode)) return true
   } catch {
     return true
+  }
+
+  // Check git worktree for uncommitted changes — this catches staged, modified,
+  // and untracked files that the find-based check would miss.
+  try {
+    const status = await runCommand(['git', 'status', '--porcelain', '--short'], targetRoot)
+    if (status.trim().length > 0) {
+      console.error('[Scout] Cache stale: git worktree has uncommitted changes')
+      return true
+    }
+  } catch {
+    // Not a git repo — continue with other checks
   }
 
   try {

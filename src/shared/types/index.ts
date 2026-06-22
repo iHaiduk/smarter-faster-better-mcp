@@ -108,6 +108,8 @@ export interface StructuredOutput {
   readonly reason: string
   readonly hints?: string
   readonly queries?: string
+  readonly worktreeStatus?: string
+  readonly staleIndexWarning?: boolean
 }
 
 export interface ScoutConfig {

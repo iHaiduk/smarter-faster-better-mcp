@@ -71,8 +71,8 @@ describe('formatFound', () => {
 
 describe('formatNotFound', () => {
   test('reports empty-project case differently', () => {
-    expect(formatNotFound('x', 0)).toContain('appears to be a new project')
-    expect(formatNotFound('x', 42)).toContain('42 symbols')
+    expect(formatNotFound('x', 0)).toContain('consider running refresh_map')
+    expect(formatNotFound('x', 42)).toContain('42 indexed symbols')
   })
 })
 
