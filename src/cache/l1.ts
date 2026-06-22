@@ -58,11 +58,12 @@ export async function isCacheStale(targetRoot: string): Promise<boolean> {
     const out = await runCommand(
       [
         'find', '.',
+        ...ignoreFindArgs(),
+        '-type', 'f',
         '-newer', mapPath,
         '(',
         ...nameArgs,
         ')',
-        ...ignoreFindArgs(),
         '-print', '-quit',
       ],
       targetRoot,

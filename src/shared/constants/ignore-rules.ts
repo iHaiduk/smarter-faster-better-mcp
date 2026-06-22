@@ -79,7 +79,7 @@ export function shouldIgnorePath(rel: string): boolean {
   )
 }
 
-/** Returns the `-not -path` fragment list suitable for the `find` command. */
+/** Returns the `-prune` fragment list suitable for the `find` command. */
 export function ignoreFindArgs(): string[] {
-  return IGNORED_DIRS.flatMap((d) => ['-not', '-path', `*/${d}/*`])
+  return IGNORED_DIRS.flatMap((d) => ['-name', d, '-prune', '-o'])
 }

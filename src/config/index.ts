@@ -12,7 +12,7 @@ export { getSourceExtensions } from '../shared/constants/extensions.js'
 export const getMapFilePath = (targetRoot: string): string => path.join(targetRoot, '.project_map.json')
 export const getCacheDir = (targetRoot: string): string => path.join(targetRoot, '.scout-cache')
 
-export const MAX_SYMBOLS = 2000
+export const MAX_SYMBOLS = 50000
 export const MAX_SYMBOLS_FOR_LLM = 150
 export const PARSE_CHUNK_SIZE = 20
 
