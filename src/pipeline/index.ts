@@ -312,15 +312,22 @@ export async function runGetFileContext(
 
   const slicedContent = lines.slice(sLine - 1, eLine).join('\n')
 
-  const filteredResult = await interceptFileRead(fileRelPath, slicedContent, query)
-  const markdown = formatInterceptedMarkdown(fileRelPath, sLine, eLine, filteredResult)
+  // We bypass the LLM filter for get_file_context. Large models are better at reading raw code directly.
+  // The LLM filter uses extra tokens for explanations and might mistakenly filter out critical details.
+  const ext = fileRelPath.split('.').pop() || 'text'
+  const markdown = [
+    `### 📄 File Context: ${fileRelPath} (L${sLine}-${eLine})`,
+    `\`\`\`${ext}`,
+    slicedContent,
+    `\`\`\``
+  ].join('\n')
 
-  const mockCandidate: LLMCandidate = { file: fileRelPath, symbol: FILE_CONTEXT_SYMBOL, confidence: filteredResult.relevanceScore }
+  const mockCandidate: LLMCandidate = { file: fileRelPath, symbol: FILE_CONTEXT_SYMBOL, confidence: 1.0 }
   const mockExtracted: ExtractedSymbol = {
     candidate: mockCandidate,
-    code: filteredResult.relevantContent,
+    code: slicedContent,
     signature: '',
-    doc: filteredResult.contextualExplanation,
+    doc: '',
     imports: [],
     importedBy: [],
     extractionOk: true,
@@ -332,8 +339,8 @@ export async function runGetFileContext(
   return toStructuredJSON(
     markdown,
     [mockExtracted],
-    filteredResult.relevanceScore,
-    `AI filtered and analyzed context for file: ${fileRelPath}`,
+    1.0,
+    `Direct file context provided.`,
     [],
     [],
     map,
