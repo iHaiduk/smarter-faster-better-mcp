@@ -21,6 +21,47 @@ export async function runFindFiles(pattern: string, targetRoot = process.cwd()):
     )
   })
 
+  if (matches.length === 0 && isGlob) {
+    // Fallback: if exact glob fails, extract words and find files containing all of them
+    const withoutBraces = normalizedPattern.replace(/\{[^}]+\}/g, '')
+    const terms = Array.from(new Set((withoutBraces.match(/[a-zA-Z0-9_-]+/g) || []).map(t => t.toLowerCase())))
+    
+    if (terms.length > 0) {
+      const fuzzyMatches = files.filter(f => {
+        const lower = f.toLowerCase()
+        return terms.every(term => lower.includes(term))
+      }).slice(0, 100) // Limit to top 100 to avoid context overflow
+
+      if (fuzzyMatches.length > 0) {
+        const markdown = [
+          `### Found 0 files matching exact pattern: "${pattern}"`,
+          `#### Fallback: Found ${fuzzyMatches.length} files containing all terms (${terms.join(', ')}):`,
+          ...fuzzyMatches.map((m) => `- ${m}`),
+        ].join('\n')
+
+        const results: ExtractedSymbol[] = fuzzyMatches.map((m) => ({
+          candidate: { file: m, symbol: FILE_MATCH_SYMBOL, confidence: 0.5 },
+          code: '',
+          signature: '',
+          doc: '',
+          imports: [],
+          importedBy: [],
+          extractionOk: true,
+          relevanceTier: 'mustRead' as const,
+        }))
+
+        return toStructuredJSON(
+          markdown,
+          results,
+          0.5,
+          `Found 0 files matching exact pattern, but discovered ${fuzzyMatches.length} files matching terms: ${terms.join(', ')}.`,
+          [],
+          [],
+        )
+      }
+    }
+  }
+
   const markdown = [
     `### Found ${matches.length} files matching: "${pattern}"`,
     ...matches.map((m) => `- ${m}`),
