@@ -1,6 +1,10 @@
 import * as path from 'node:path'
 import * as fs from 'node:fs/promises'
 import type { Dirent } from 'node:fs'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFile)
 
 import { clearL1 } from '../../cache/l1.js'
 import { getMapFilePath, getParserMode, getSourceExtensions, MAX_SYMBOLS, PARSE_CHUNK_SIZE } from '../../config/index.js'
@@ -61,8 +65,28 @@ export async function getProjectFiles(
   parserMode: ParserMode = getParserMode(),
 ): Promise<string[]> {
   const files: string[] = []
+  const supportedExtensions = getSourceExtensions(parserMode)
+
   try {
-    await scanDirRecursive(targetRoot, targetRoot, files, getSourceExtensions(parserMode))
+    const { stdout } = await execFileAsync('git', ['ls-files', '--cached', '--others', '--exclude-standard'], { cwd: targetRoot, maxBuffer: 1024 * 1024 * 10 })
+    const gitFiles = stdout.split('\n')
+    for (const file of gitFiles) {
+      if (!file) continue
+      const ext = path.extname(file).toLowerCase()
+      if (supportedExtensions.has(ext) && !shouldSkipFile(file)) {
+        files.push(file)
+      }
+    }
+    
+    if (files.length > 0) {
+      return files
+    }
+  } catch (err) {
+    // Silently fall through if git is not available or not a git repo
+  }
+
+  try {
+    await scanDirRecursive(targetRoot, targetRoot, files, supportedExtensions)
   } catch (err) {
     console.error(`[Scout] getProjectFiles failed under ${targetRoot}:`, err)
   }

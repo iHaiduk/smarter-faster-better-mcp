@@ -2,12 +2,15 @@
 export const IGNORED_DIRS = [
   // 1. Dependency Directories
   'node_modules',
+  'Pods',
+  'vendor',
 
   // 2. Build & Compilation Artifacts (Compiled/built files)
   'dist',
   'build',
   'bin',
   'out',
+  'DerivedData',
 
   // 3. Cache & History Directories
   'cache',
@@ -25,9 +28,13 @@ export const IGNORED_DIRS = [
   '.git',
   '.ide',
   '.vscode',
+  '.idea',
   '.expo',
   '.next',
   '.nuxt',
+  '.gradle',
+  '.dart_tool',
+  '.symlinks',
   'coverage',
 ] as const
 
