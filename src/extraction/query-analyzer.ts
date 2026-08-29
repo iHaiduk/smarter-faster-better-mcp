@@ -50,6 +50,7 @@ export async function analyzeQuery(
   task: string,
   config: ScoutConfig,
 ): Promise<QueryAnalysis | null> {
+  if (!config.baseUrl || !config.apiKey || !config.model) return null
   if (task.length < 5) return null
   if (/^[a-zA-Z_]\w+$/.test(task.trim())) return null
 

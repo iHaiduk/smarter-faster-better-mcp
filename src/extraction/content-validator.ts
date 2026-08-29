@@ -66,8 +66,10 @@ async function llmBatchValidate(
   symbols: readonly ExtractedSymbol[],
   analysis: QueryAnalysis | null,
   config: ScoutConfig,
-): Promise<Set<string>> {
-  if (symbols.length === 0) return new Set()
+): Promise<ReadonlySet<string>> {
+  if (symbols.length === 0 || !config.baseUrl || !config.apiKey || !config.model) {
+    return new Set(symbols.map((s) => `${s.candidate.file}::${s.candidate.symbol}`))
+  }
 
   const symbolSummaries = symbols
     .map((s, i) => {
@@ -196,7 +198,7 @@ export async function validateExtractedSymbols(
   }
 
   // Cap borderline to avoid excessive LLM token usage
-  let llmKept = new Set<string>()
+  let llmKept: ReadonlySet<string> = new Set<string>()
   if (borderline.length > 0) {
     const toValidate = borderline.slice(0, MAX_BORDERLINE_FOR_LLM)
     if (borderline.length > MAX_BORDERLINE_FOR_LLM) {

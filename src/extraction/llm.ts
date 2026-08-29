@@ -78,6 +78,7 @@ async function singleLLMRequest(
   signal: AbortSignal,
   temperature = 0,
 ): Promise<readonly LLMCandidate[] | null> {
+  if (!config.model) return null
   const raw = await llmFetch(
     config.baseUrl,
     config.apiKey,
@@ -117,6 +118,10 @@ export async function askCheapLLM(
   config: ScoutConfig,
   analysis?: QueryAnalysis | null,
 ): Promise<LLMCandidate[] | null> {
+  if (!config.baseUrl || !config.apiKey || !config.model) {
+    return null
+  }
+
   const MAX_ATTEMPTS = 2
 
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {

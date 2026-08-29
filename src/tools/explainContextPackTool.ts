@@ -12,18 +12,21 @@ const DESCRIPTION =
 
 const SCHEMA = {
   task: z.string().describe('The planning or feature implementation task details'),
-  workspaceRoot: z.string().optional().describe('Target workspace root'),
+  workspaceRoot: z.string().optional().describe('Target project root directory path (defaults to auto-detected project root)'),
 }
 
 export function registerExplainContextPackTool(server: McpServer, config: ScoutConfig): void {
-  server.tool('explain_context_pack', DESCRIPTION, SCHEMA, async (args) => {
+  const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
       const text = await runExplainContextPack(args.task, config, root)
-      return { content: [{ type: 'text', text }] }
+      return { content: [{ type: 'text' as const, text }] }
     } catch (err) {
       const errorMsg = errorMessage(err)
-      return { content: [{ type: 'text', text: formatDegraded(`explain_context_pack failed: ${errorMsg}`) }] }
+      return { content: [{ type: 'text' as const, text: formatDegraded(`explain_context_pack failed: ${errorMsg}`) }] }
     }
-  })
+  }
+
+  server.tool('explain_context_pack', DESCRIPTION, SCHEMA, handler)
+  server.tool('scout_explain_context_pack', DESCRIPTION, SCHEMA, handler)
 }

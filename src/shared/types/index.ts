@@ -71,7 +71,7 @@ export interface LLMCandidate {
 
 export type RelevanceTier = 'mustRead' | 'likelyRelevant' | 'dependencyOnly' | 'testsOrExamples' | 'excluded'
 
-export type ParserMode = 'oxc' | 'tree-sitter'
+export type ParserMode = 'oxc' | 'tree-sitter' | 'auto'
 
 export interface CandidateRange {
   readonly startLine: number
@@ -113,9 +113,9 @@ export interface StructuredOutput {
 }
 
 export interface ScoutConfig {
-  readonly baseUrl: string
-  readonly apiKey: string
-  readonly model: string
+  readonly baseUrl?: string
+  readonly apiKey?: string
+  readonly model?: string
   readonly llmTimeoutMs: number
   readonly llmParallelism: number
   readonly parser: ParserMode

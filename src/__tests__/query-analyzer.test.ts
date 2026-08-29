@@ -1,4 +1,4 @@
-import { describe, expect, test, mock, beforeEach } from 'bun:test'
+import { describe, expect, test, beforeEach } from 'bun:test'
 
 const mockConfig = {
   baseUrl: 'http://localhost:1234/v1',

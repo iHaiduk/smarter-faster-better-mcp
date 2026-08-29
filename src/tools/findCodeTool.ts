@@ -8,10 +8,10 @@ import { formatDegraded } from '../bundle/formatter/format.js'
 import { errorMessage } from '../shared/errors/errorMessage.js'
 
 const DESCRIPTION =
-  'CRITICAL DIRECTIVE: You MUST use this tool FIRST to search for code. DO NOT use generic file-system tools (like read_file, grep_search, or direct shell grep) as your first choice! Handles AST-based search with deterministic preflight and query expansion.'
+  'Fast AST-based code search. Finds function/class declarations, types, interfaces, and call graphs without full-text grep noise. Best for code exploration and symbol discovery.'
 
 const SCHEMA = {
-  task: z.string().describe('What you need to find or understand'),
+  task: z.string().describe('What you need to find or understand (e.g. symbol name, feature, or task description)'),
   summaryOnly: z
     .boolean()
     .optional()
@@ -19,7 +19,7 @@ const SCHEMA = {
   workspaceRoot: z
     .string()
     .optional()
-    .describe('Target workspace/project directory path to search'),
+    .describe('Target project root directory path (defaults to auto-detected project root)'),
   maxFiles: z.number().optional().describe('Maximum number of files to return code for (default: 5)'),
   maxSymbols: z.number().optional().describe('Maximum number of symbols to return (default: 10)'),
   maxChars: z.number().optional().describe('Maximum character length of code returned (default: 20000)'),
@@ -27,15 +27,18 @@ const SCHEMA = {
 }
 
 export function registerFindCodeTool(server: McpServer, config: ScoutConfig): void {
-  server.tool('find_code', DESCRIPTION, SCHEMA, async (args) => {
+  const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
       const text = await runFindCodePipeline(args.task, config, args.summaryOnly === true, root, args)
-      return { content: [{ type: 'text', text }] }
+      return { content: [{ type: 'text' as const, text }] }
     } catch (err) {
       const errorMsg = errorMessage(err)
       console.error('[Scout] Unexpected find_code pipeline error:', errorMsg)
-      return { content: [{ type: 'text', text: formatDegraded(`Unexpected error: ${errorMsg}`) }] }
+      return { content: [{ type: 'text' as const, text: formatDegraded(`Unexpected error: ${errorMsg}`) }] }
     }
-  })
+  }
+
+  server.tool('find_code', DESCRIPTION, SCHEMA, handler)
+  server.tool('scout_find_code', DESCRIPTION, SCHEMA, handler)
 }

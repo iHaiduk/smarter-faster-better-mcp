@@ -26,12 +26,15 @@ interface LlmChatResponse {
  * When `signal` is absent, `options.timeoutMs` is used to create an internal controller.
  */
 export async function llmFetch(
-  baseUrl: string,
-  apiKey: string,
+  baseUrl: string | undefined,
+  apiKey: string | undefined,
   messages: readonly LlmMessage[],
   options: LlmFetchOptions,
   signal?: AbortSignal,
 ): Promise<string | null> {
+  if (!baseUrl || !apiKey || !options.model) {
+    return null
+  }
   const controller = signal ? undefined : new AbortController()
   const timeout =
     !signal && options.timeoutMs

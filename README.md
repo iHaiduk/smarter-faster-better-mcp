@@ -180,15 +180,15 @@ Add `.env` to your `.gitignore` to keep configurations private.
 
 | Variable | Description | Default | Required |
 | :--- | :--- | :--- | :--- |
-| `SCOUT_BASE_URL` | Endpoint of your LLM provider (e.g. Ollama, OpenAI) | - | **Yes** |
-| `SCOUT_API_KEY` | API Key for authorization (`ollama` for Ollama) | - | **Yes** |
-| `SCOUT_MODEL` | LLM model name (e.g. `llama3.1:8b`, `gpt-4o-mini`) | - | **Yes** |
+| `SCOUT_BASE_URL` | Endpoint of your LLM provider (e.g. Ollama, OpenAI, LM Studio) | - | No (Offline AST by default) |
+| `SCOUT_API_KEY` | API Key for authorization (`ollama` for Ollama) | - | No (Offline AST by default) |
+| `SCOUT_MODEL` | LLM model name (e.g. `llama3.1:8b`, `gpt-4o-mini`) | - | No (Offline AST by default) |
 | `SCOUT_LLM_TIMEOUT_MS` | Max wait time for LLM classification | `30000` | No |
-| `SCOUT_CONFIDENCE_THRESHOLD` | Minimum confidence score to extract a symbol (0.0 to 1.0) | `0.5` | No |
 | `SCOUT_LLM_PARALLELISM` | Number of concurrent requests sent to local LLM | `2` | No |
-| `SCOUT_PARSER` | Parser mode: `oxc` or `tree-sitter` | `oxc` | No |
+| `SCOUT_PARSER` | Parser mode: `auto` (detects non-JS/TS files), `oxc`, or `tree-sitter` | `auto` | No |
+| `SCOUT_WORKSPACE_ROOT` | Override target workspace directory path | Auto-discovered | No |
 
-You can also enable polyglot parsing with a CLI flag:
+You can also force a specific parser mode with a CLI flag:
 
 ```bash
 npx smarter-faster-better-mcp --parser tree-sitter

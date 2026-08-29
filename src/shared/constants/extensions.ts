@@ -12,7 +12,7 @@ export const TREE_SITTER_SOURCE_EXTENSIONS: ReadonlySet<string> = new Set([
 ])
 
 export function getSourceExtensions(parserMode: ParserMode): ReadonlySet<string> {
-  return parserMode === 'tree-sitter' ? TREE_SITTER_SOURCE_EXTENSIONS : OXC_SOURCE_EXTENSIONS
+  return parserMode === 'oxc' ? OXC_SOURCE_EXTENSIONS : TREE_SITTER_SOURCE_EXTENSIONS
 }
 
 /** Returns true when the extension belongs to a JS/TS source file. */

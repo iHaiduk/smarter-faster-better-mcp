@@ -1,6 +1,6 @@
 import { describe, expect, test, afterEach } from 'bun:test'
 
-import type { ExtractedSymbol, LLMCandidate, QueryAnalysis, ScoutConfig } from '../shared/types/index.js'
+import type { ExtractedSymbol, QueryAnalysis, ScoutConfig } from '../shared/types/index.js'
 
 const originalFetch = global.fetch
 
@@ -179,7 +179,6 @@ describe('validateExtractedSymbols with LLM batch validation', () => {
       mockConfig,
     )
 
-    const names = result.map((s) => s.candidate.symbol)
     // getFileState rejected by LLM, formatDate rejected deterministically
     // Fallback should keep at least one
     expect(result.length).toBeGreaterThanOrEqual(1)

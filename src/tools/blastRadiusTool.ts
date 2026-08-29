@@ -12,18 +12,21 @@ const DESCRIPTION =
 const SCHEMA = {
   symbolName: z.string().describe('Name of the symbol to analyze'),
   file: z.string().describe('File path where the symbol is defined'),
-  workspaceRoot: z.string().optional().describe('Target workspace root'),
+  workspaceRoot: z.string().optional().describe('Target project root directory path (defaults to auto-detected project root)'),
 }
 
 export function registerBlastRadiusTool(server: McpServer): void {
-  server.tool('blast_radius', DESCRIPTION, SCHEMA, async (args) => {
+  const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
       const text = await runBlastRadiusPipeline(args.symbolName, args.file, root)
-      return { content: [{ type: 'text', text }] }
+      return { content: [{ type: 'text' as const, text }] }
     } catch (err) {
       const errorMsg = errorMessage(err)
-      return { content: [{ type: 'text', text: formatDegraded(`blast_radius failed: ${errorMsg}`) }] }
+      return { content: [{ type: 'text' as const, text: formatDegraded(`blast_radius failed: ${errorMsg}`) }] }
     }
-  })
+  }
+
+  server.tool('blast_radius', DESCRIPTION, SCHEMA, handler)
+  server.tool('scout_blast_radius', DESCRIPTION, SCHEMA, handler)
 }

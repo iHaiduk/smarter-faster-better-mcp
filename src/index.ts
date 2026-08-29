@@ -7,7 +7,7 @@ import { createRequire } from 'node:module'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
-import { loadConfig, MissingConfigError } from './config/index.js'
+import { loadConfig } from './config/index.js'
 import { registerAllTools } from './tools/registerTools.js'
 
 const requireUtil = createRequire(import.meta.url)
@@ -29,7 +29,14 @@ async function initializeServer(): Promise<void> {
   const config = loadConfig()
   const mcpServer = new McpServer({ name: SERVER_NAME, version: SCOUT_VERSION })
   
+  const hasLlm = Boolean(config.baseUrl && config.apiKey && config.model)
   console.error(`[Scout] Parser mode: ${config.parser}`)
+  if (hasLlm) {
+    console.error(`[Scout] LLM connected: ${config.model} (${config.baseUrl})`)
+  } else {
+    console.error('[Scout] Running in Zero-Config Local AST mode (deterministic & offline)')
+  }
+  
   registerAllTools(mcpServer, config)
   
   const transport = new StdioServerTransport()
@@ -41,11 +48,7 @@ async function main(): Promise<void> {
   try {
     await initializeServer()
   } catch (err) {
-    if (err instanceof MissingConfigError) {
-      console.error(`[Scout] ${err.message}`)
-    } else {
-      console.error('[Scout] Fatal startup error:', err)
-    }
+    console.error('[Scout] Fatal startup error:', err)
     process.exit(1)
   }
 }

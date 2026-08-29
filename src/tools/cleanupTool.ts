@@ -10,7 +10,7 @@ const DESCRIPTION =
   'Cleans the workspace by removing temporary directories, build outputs (dist, build, cache, bin), and unwanted dotfiles/folders (.git, .ide, .vscode, .DS_Store), while preserving critical files (node_modules, .env, configurations).'
 
 const SCHEMA = {
-  workspaceRoot: z.string().optional().describe('Target workspace root directory to clean up'),
+  workspaceRoot: z.string().optional().describe('Target project root directory path (defaults to auto-detected project root)'),
   dryRun: z
     .boolean()
     .optional()
@@ -18,7 +18,7 @@ const SCHEMA = {
 }
 
 export function registerCleanupTool(server: McpServer): void {
-  server.tool('cleanup_workspace', DESCRIPTION, SCHEMA, async (args) => {
+  const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     const dryRun = args.dryRun ?? false
 
@@ -47,17 +47,20 @@ export function registerCleanupTool(server: McpServer): void {
         preservedSection,
       ].join('\n')
 
-      return { content: [{ type: 'text', text }] }
+      return { content: [{ type: 'text' as const, text }] }
     } catch (err) {
       const errorMsg = errorMessage(err)
       return {
         content: [
           {
-            type: 'text',
+            type: 'text' as const,
             text: formatDegraded(`cleanup_workspace failed: ${errorMsg}`),
           },
         ],
       }
     }
-  })
+  }
+
+  server.tool('cleanup_workspace', DESCRIPTION, SCHEMA, handler)
+  server.tool('scout_cleanup_workspace', DESCRIPTION, SCHEMA, handler)
 }

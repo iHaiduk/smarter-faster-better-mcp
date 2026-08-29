@@ -13,11 +13,11 @@ import { errorMessage } from '../shared/errors/errorMessage.js'
 const DESCRIPTION = 'Force rebuild project symbol map and AST import graph. Use when new files are added.'
 
 const SCHEMA = {
-  workspaceRoot: z.string().optional().describe('Target workspace root to rebuild map for'),
+  workspaceRoot: z.string().optional().describe('Target project root directory path (defaults to auto-detected project root)'),
 }
 
 export function registerRefreshMapTool(server: McpServer): void {
-  server.tool('refresh_map', DESCRIPTION, SCHEMA, async (args) => {
+  const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
       const mapPath = getMapFilePath(root)
@@ -29,7 +29,7 @@ export function registerRefreshMapTool(server: McpServer): void {
       return {
         content: [
           {
-            type: 'text',
+            type: 'text' as const,
             text: `[Scout] Map rebuilt: ${map.symbolsCount} symbols in ${fileCount} files for ${root}`,
           },
         ],
@@ -37,8 +37,11 @@ export function registerRefreshMapTool(server: McpServer): void {
     } catch (err) {
       const errorMsg = errorMessage(err)
       return {
-        content: [{ type: 'text', text: formatDegraded(`refresh_map failed: ${errorMsg}`) }],
+        content: [{ type: 'text' as const, text: formatDegraded(`refresh_map failed: ${errorMsg}`) }],
       }
     }
-  })
+  }
+
+  server.tool('refresh_map', DESCRIPTION, SCHEMA, handler)
+  server.tool('scout_refresh_map', DESCRIPTION, SCHEMA, handler)
 }

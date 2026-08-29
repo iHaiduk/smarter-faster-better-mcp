@@ -6,7 +6,19 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.6.0] - 2026-06-20
+## [0.8.3] - 2026-08-29
+
+### Added
+- **Zero-Config / Offline AST Mode**: Server no longer requires `SCOUT_BASE_URL`, `SCOUT_API_KEY`, or `SCOUT_MODEL` to run. AST search, import tracing, file slicing, and dependency analysis operate fully offline out of the box.
+- **Dual Tool Registration (Aliases)**: Registered both primary tool names (`find_code`, `trace_symbol`, `get_file_context`, `find_files`, `blast_radius`, `explain_context_pack`, `refresh_map`, `cleanup_workspace`) and prefix aliases (`scout_find_code`, `scout_trace_symbol`, etc.) for seamless compatibility across various agent prompt templates.
+- **Smart Workspace Root Auto-Discovery**: Automatically discovers the project root from the current working directory by searching for standard project markers (`.git`, `package.json`, `Cargo.toml`, `go.mod`, `pyproject.toml`, etc.) and environment variables (`SCOUT_WORKSPACE_ROOT`, `WORKSPACE_ROOT`).
+- **Auto-Detect Parser Mode (`auto`)**: Automatically switches to Tree-sitter for polyglot repositories (Python, Go, Rust, Java, C++, PHP, Dart) while retaining maximum OXC speed for TypeScript/JavaScript files.
+
+### Changed
+- Refined MCP tool descriptions to replace legacy uppercase directives with clean, semantic capability definitions.
+- Updated `AGENTS.template.md` and `README.md` to reflect Zero-Config mode and dual naming.
+
+---
 
 ### Added
 - **Query Analysis** (`query-analyzer.ts`): LLM-powered query analysis that classifies intent (specificSymbol, featureSearch, conceptSearch, fileSearch), extracts symbol names, expanded search terms, and file patterns before searching. Runs as the first step of the `find_code` pipeline with a 5s timeout and graceful fallback on failure.

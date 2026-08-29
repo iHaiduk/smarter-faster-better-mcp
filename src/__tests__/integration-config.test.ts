@@ -1,6 +1,8 @@
+import * as path from 'node:path'
 import { describe, expect, test, beforeAll, afterAll } from 'bun:test'
 import { loadConfig, getParserMode } from '../config/index.js'
 import { buildMap, getProjectFiles } from '../indexing/symbol-map/build-map.js'
+import { resolveWorkspaceRoot } from '../shared/fs/resolveWorkspaceRoot.js'
 import type { ProjectMap } from '../shared/types/index.js'
 
 describe('Integration: Config Loading', () => {
@@ -30,7 +32,7 @@ describe('Integration: Config Loading', () => {
     const config = loadConfig()
     expect(config).toBeDefined()
     expect(typeof config.parser).toBe('string')
-    expect(config.parser).toMatch(/^(oxc|tree-sitter)$/)
+    expect(config.parser).toMatch(/^(oxc|tree-sitter|auto)$/)
     expect(typeof config.llmTimeoutMs).toBe('number')
     expect(config.llmTimeoutMs).toBeGreaterThan(0)
     expect(typeof config.llmParallelism).toBe('number')
@@ -39,7 +41,33 @@ describe('Integration: Config Loading', () => {
 
   test('getParserMode returns valid mode', () => {
     const mode = getParserMode()
-    expect(mode).toMatch(/^(oxc|tree-sitter)$/)
+    expect(mode).toMatch(/^(oxc|tree-sitter|auto)$/)
+  })
+
+  test('loadConfig works in zero-config mode when env vars are missing', () => {
+    const config = loadConfig({})
+    expect(config).toBeDefined()
+    expect(config.baseUrl).toBeUndefined()
+    expect(config.apiKey).toBeUndefined()
+    expect(config.model).toBeUndefined()
+    expect(config.parser).toMatch(/^(oxc|tree-sitter|auto)$/)
+  })
+})
+
+describe('Integration: Workspace Root Resolution', () => {
+  test('resolves explicit relative path', () => {
+    const root = resolveWorkspaceRoot('./src')
+    expect(root).toBe(path.resolve(process.cwd(), './src'))
+  })
+
+  test('resolves explicit absolute path', () => {
+    const root = resolveWorkspaceRoot('/tmp')
+    expect(root).toBe('/tmp')
+  })
+
+  test('auto-discovers project root from current working directory', () => {
+    const root = resolveWorkspaceRoot()
+    expect(root).toBe(process.cwd())
   })
 })
 

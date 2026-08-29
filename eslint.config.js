@@ -14,6 +14,11 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    languageOptions: {
+      parserOptions: {
+        warnOnUnsupportedTypeScriptVersion: false,
+      },
+    },
     rules: {
       '@typescript-eslint/no-explicit-any': 'warn', // предупреждение вместо ошибки на any
       'no-console': 'off', // в CLI-утилитах console.log разрешен

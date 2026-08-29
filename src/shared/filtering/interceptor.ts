@@ -38,8 +38,11 @@ export async function interceptFileRead(
   let config
   try {
     config = loadConfig()
+    if (!config.baseUrl || !config.apiKey || !config.model) {
+      return fallbackResult
+    }
   } catch {
-    // Config not available (e.g. env vars missing) -> immediate fallback
+    // Config not available -> immediate fallback
     return fallbackResult
   }
 

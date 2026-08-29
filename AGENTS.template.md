@@ -10,31 +10,26 @@ This project uses **MCP Scout** (`smarter-faster-better-mcp`) for AST-based code
 
 | MCP Tool | Purpose | Priority |
 | :--- | :--- | :--- |
-| `scout_find_code` | **FIRST choice** for any code search — AST-based search with query expansion | **Highest** |
-| `scout_trace_symbol` | Find callers, callees, imports, and dependencies of a symbol | **Highest** |
-| `scout_get_file_context` | Read file contents — use instead of `read_file` or `view_file` | **Highest** |
-| `scout_find_files` | Find files by pattern or suffix | **High** |
-| `scout_refresh_map` | Rebuild project symbol map when new files are added | Medium |
-| `scout_explain_context_pack` | Generate planning overview with collapsed code bodies | **High** |
-| `scout_cleanup_workspace` | Clean temporary/build output from workspace | Low |
+| `find_code` (or `scout_find_code`) | **Primary search** — AST-based code search with query expansion | **Highest** |
+| `trace_symbol` (or `scout_trace_symbol`) | Trace callers, callees, imports, and dependencies of a symbol | **Highest** |
+| `get_file_context` (or `scout_get_file_context`) | Inspect code slices with resolved imports & type definitions | **Highest** |
+| `blast_radius` (or `scout_blast_radius`) | Analyze affected dependencies and call flows before refactoring | **High** |
+| `find_files` (or `scout_find_files`) | Fast glob file search with smart ignore filters | **High** |
+| `explain_context_pack` (or `scout_explain_context_pack`) | Generate planning overview with collapsed code bodies | **High** |
+| `refresh_map` (or `scout_refresh_map`) | Force rebuild project symbol map when files change | Medium |
+| `cleanup_workspace` (or `scout_cleanup_workspace`) | Clean temporary cache/build outputs | Low |
 
 ## Always Do
 
-- **MUST use `scout_find_code` FIRST** for any code search or understanding task — never start with `grep`, `bash find`, or `Task`.
-- **MUST use `scout_trace_symbol`** instead of `grep` to find callers, re-exports, and dependencies of a symbol.
-- **MUST use `scout_get_file_context`** instead of `read_file` or `view_file` to inspect code contents.
-- **MUST retry Scout tool calls at least once** if they fail or time out, before assuming Scout is unavailable.
-
-## Never Do
-
-- NEVER start code search with `grep`, `bash find`, or generic `read_file` when Scout is available.
-- NEVER use `Task` tool for file exploration when a Scout MCP tool can do it faster.
-- NEVER assume Scout is unavailable after a single failure — retry once first.
+- **Prefer `find_code` (or `scout_find_code`)** for any code search or architecture understanding.
+- **Use `trace_symbol` (or `scout_trace_symbol`)** to inspect symbol references, call chains, and re-exports.
+- **Use `get_file_context` (or `scout_get_file_context`)** to read precise code slices with resolved types.
+- **Use `blast_radius` (or `scout_blast_radius`)** before refactoring or deleting shared functions.
 
 ## Fallback Sequence
 
-1. `scout_find_code` / `scout_trace_symbol` / `scout_get_file_context` (primary)
-2. `Task` tool (secondary — only if Scout fails or times out)
-3. `grep` / `bash find` / raw file reads (last resort)
+1. `find_code` / `trace_symbol` / `get_file_context` (primary AST tools)
+2. `find_files` / `refresh_map` (file navigation & index sync)
+3. `grep` / raw file reads (fallback if symbol is unindexed)
 
 <!-- scout:end -->
