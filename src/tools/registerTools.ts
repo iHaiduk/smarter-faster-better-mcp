@@ -9,6 +9,9 @@ import { registerExplainContextPackTool } from './explainContextPackTool.js'
 import { registerRefreshMapTool } from './refreshMapTool.js'
 import { registerCleanupTool } from './cleanupTool.js'
 import { registerBlastRadiusTool } from './blastRadiusTool.js'
+import { registerDiagnosticsTool } from './diagnosticsTool.js'
+import { registerDeadCodeTool } from './deadCodeTool.js'
+import { registerSubsystemClustersTool } from './subsystemClustersTool.js'
 
 export function registerAllTools(server: McpServer, config: ScoutConfig): void {
   registerFindCodeTool(server, config)
@@ -19,4 +22,9 @@ export function registerAllTools(server: McpServer, config: ScoutConfig): void {
   registerRefreshMapTool(server)
   registerCleanupTool(server)
   registerBlastRadiusTool(server)
+  registerDiagnosticsTool(server)
+  registerDeadCodeTool(server)
+  registerSubsystemClustersTool(server)
 }
+
+

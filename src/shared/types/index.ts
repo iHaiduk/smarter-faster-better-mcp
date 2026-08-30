@@ -150,3 +150,54 @@ export const isAstNode = (value: unknown): value is AstNode =>
 
 export const isIdentifier = (value: unknown): value is AstIdentifier =>
   isAstNode(value) && value.type === 'Identifier' && typeof (value as { name?: unknown }).name === 'string'
+
+export type DeadCodeType = 'dead_file' | 'dead_export' | 'dead_symbol'
+
+export interface DeadCodeItem {
+  readonly type: DeadCodeType
+  readonly file: string
+  readonly name: string
+  readonly line?: number
+  readonly kind?: string
+  readonly confidence: number
+  readonly reason: string
+}
+
+export interface DeadCodeReport {
+  readonly summary: {
+    readonly totalFilesScanned: number
+    readonly deadFilesCount: number
+    readonly deadExportsCount: number
+    readonly deadSymbolsCount: number
+    readonly entrypointsCount: number
+  }
+  readonly entrypoints: readonly string[]
+  readonly deadFiles: readonly DeadCodeItem[]
+  readonly deadExports: readonly DeadCodeItem[]
+  readonly deadSymbols: readonly DeadCodeItem[]
+}
+
+export interface SubsystemCluster {
+  readonly id: number
+  readonly name: string
+  readonly dominantDir: string
+  readonly files: readonly string[]
+  readonly internalEdgeWeight: number
+  readonly totalEdgeWeight: number
+  readonly cohesion: number
+  readonly topKeywords: readonly string[]
+}
+
+export interface SubsystemMetrics {
+  readonly modularity: number
+  readonly clustersCount: number
+  readonly totalNodes: number
+  readonly totalEdges: number
+  readonly clusters: readonly SubsystemCluster[]
+  readonly interClusterDependencies: readonly {
+    readonly fromCluster: number
+    readonly toCluster: number
+    readonly weight: number
+  }[]
+}
+

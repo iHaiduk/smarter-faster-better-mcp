@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.9.0] - 2026-08-30
+
+### Added
+- **Dead Code Detection (`dead_code` / `scout_dead_code`)**:
+  - Full AST dependency & reachability graph traversal from project entrypoints.
+  - Automatically identifies unreachable/orphan files, unused named exports, and isolated dead cycles.
+  - Smart entrypoint resolution from `package.json` (`main`, `bin`, `exports`), configuration files, and custom arguments.
+- **Louvain Community Subsystem Clustering (`subsystem_clusters` / `scout_cluster_subsystems`)**:
+  - Pure TypeScript, zero-dependency Louvain modularity optimization algorithm.
+  - Discovers high-cohesion architectural subsystems, modules, and domain boundaries on weighted AST dependency graphs.
+  - Computes modularity score ($Q$), internal cohesion ratios, and inter-subsystem coupling paths.
+  - Automatic subsystem taxonomy and domain naming based on directory hierarchy and keyword extraction.
+- Unit & integration tests for Dead Code Detection and Louvain Community Clustering.
+
+---
+
 ## [0.8.3] - 2026-08-29
 
 ### Added

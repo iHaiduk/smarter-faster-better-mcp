@@ -9,6 +9,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 
 import { loadConfig } from './config/index.js'
 import { registerAllTools } from './tools/registerTools.js'
+import { getWorkspaceWatcher, stopWorkspaceWatcher } from './indexing/watcher/index.js'
 
 const requireUtil = createRequire(import.meta.url)
 const PACKAGE_JSON_PATH = '../package.json'
@@ -38,10 +39,21 @@ async function initializeServer(): Promise<void> {
   }
   
   registerAllTools(mcpServer, config)
+
+  // Start background file watcher for incremental indexing & LSP sync
+  const watcher = getWorkspaceWatcher(process.cwd())
+  watcher.start()
   
   const transport = new StdioServerTransport()
   await mcpServer.connect(transport)
   console.error('[Scout] Server running on stdio')
+
+  // Handle graceful shutdown
+  const cleanup = async () => {
+    await stopWorkspaceWatcher()
+  }
+  process.on('SIGINT', cleanup)
+  process.on('SIGTERM', cleanup)
 }
 
 async function main(): Promise<void> {

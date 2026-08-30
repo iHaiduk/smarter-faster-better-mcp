@@ -8,8 +8,16 @@ import { l2Get, l2Set } from './l2.js'
 
 import type { ExtractedSymbol, LLMCandidate, ProjectMap, SymbolEntry } from '../shared/types/index.js'
 
+import { getWorkspaceWatcher } from '../indexing/watcher/index.js'
+
 /** Reads the persisted project map from disk, or rebuilds it on miss/schema mismatch. */
 export async function readMap(targetRoot: string): Promise<ProjectMap> {
+  const watcher = getWorkspaceWatcher(targetRoot)
+  const cachedFromWatcher = watcher.getMap()
+  if (cachedFromWatcher) {
+    return cachedFromWatcher
+  }
+
   const mapPath = getMapFilePath(targetRoot)
   try {
     if (await fileExists(mapPath)) {
@@ -21,13 +29,16 @@ export async function readMap(targetRoot: string): Promise<ProjectMap> {
         data.files.length > 0 &&
         projectMapMatchesParserMode(data)
       ) {
+        watcher.setMap(data)
         return data
       }
     }
   } catch (err) {
     console.error('[Scout] Failed to read project map, rebuilding:', err instanceof Error ? err.message : String(err))
   }
-  return await buildMap(targetRoot)
+  const builtMap = await buildMap(targetRoot)
+  watcher.setMap(builtMap)
+  return builtMap
 }
 
 /** Checks L1 (memory) then L2 (disk) caches for an already-extracted symbol. */

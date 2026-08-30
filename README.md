@@ -276,8 +276,24 @@ Returns a token-efficient planning outline of relevant code files with collapsed
 - **Parameters**: `task`, `workspaceRoot`
 
 ### `refresh_map`
-Forces a complete rebuild of the project AST symbol map and import graph. Use when new files are added.
+Forces a complete rebuild of the project AST symbol map and import graph. Use when new files are added manually or cache needs full invalidation.
 - **Parameters**: `workspaceRoot`
+
+### `blast_radius`
+Analyzes the blast radius of changing a code symbol. Shows all files, modules, and execution flows that would be affected by modifying the target symbol. Use before refactoring, renaming, or deleting shared code.
+- **Parameters**: `symbolName`, `file`, `workspaceRoot`
+
+### `dead_code` (or `scout_dead_code`)
+Detects dead / unused code in the project. Identifies unreachable orphan files, dead exports never imported elsewhere, and dead islands using full BFS graph reachability from project entrypoints.
+- **Parameters**: `entrypoints`, `includeExports`, `minConfidence`, `workspaceRoot`
+
+### `subsystem_clusters` (or `scout_cluster_subsystems`)
+Performs Louvain community detection on the project dependency graph to discover architectural subsystems, modules, and domain boundaries with cohesion and coupling metrics.
+- **Parameters**: `resolution`, `minClusterSize`, `workspaceRoot`
+
+### `get_diagnostics`
+*Live LSP & Compiler Diagnostics Bridge.* Retrieves real-time semantic diagnostics (type errors, syntax errors, missing/unresolved imports) powered by TypeScript Language Service in the background.
+- **Parameters**: `file` (optional relative/absolute path), `severity` (`'error' | 'warning' | 'all'`), `limit`, `targetRoot`
 
 ---
 

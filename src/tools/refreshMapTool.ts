@@ -6,6 +6,7 @@ import { clearL1 } from '../cache/l1.js'
 import { l2Clear } from '../cache/l2.js'
 import { getMapFilePath } from '../config/index.js'
 import { buildMap } from '../indexing/symbol-map/build-map.js'
+import { getWorkspaceWatcher } from '../indexing/watcher/index.js'
 import { resolveWorkspaceRoot } from '../shared/fs/resolveWorkspaceRoot.js'
 import { formatDegraded } from '../bundle/formatter/format.js'
 import { errorMessage } from '../shared/errors/errorMessage.js'
@@ -25,6 +26,7 @@ export function registerRefreshMapTool(server: McpServer): void {
       clearL1()
       await l2Clear(root)
       const map = await buildMap(root)
+      getWorkspaceWatcher(root).setMap(map)
       const fileCount = new Set(map.symbols.map((sym) => sym.file)).size
       return {
         content: [
