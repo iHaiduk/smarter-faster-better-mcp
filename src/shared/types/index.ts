@@ -112,10 +112,14 @@ export interface StructuredOutput {
   readonly staleIndexWarning?: boolean
 }
 
+export * from './jev.js'
+
 export interface ScoutConfig {
   readonly baseUrl?: string
   readonly apiKey?: string
   readonly model?: string
+  readonly jevApiKey?: string
+  readonly jevBaseUrl?: string
   readonly llmTimeoutMs: number
   readonly llmParallelism: number
   readonly parser: ParserMode

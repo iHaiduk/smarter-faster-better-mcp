@@ -12,6 +12,7 @@ import { registerBlastRadiusTool } from './blastRadiusTool.js'
 import { registerDiagnosticsTool } from './diagnosticsTool.js'
 import { registerDeadCodeTool } from './deadCodeTool.js'
 import { registerSubsystemClustersTool } from './subsystemClustersTool.js'
+import { registerDynamicTriageTool } from './dynamicTriageTool.js'
 
 export function registerAllTools(server: McpServer, config: ScoutConfig): void {
   registerFindCodeTool(server, config)
@@ -25,6 +26,7 @@ export function registerAllTools(server: McpServer, config: ScoutConfig): void {
   registerDiagnosticsTool(server)
   registerDeadCodeTool(server)
   registerSubsystemClustersTool(server)
+  registerDynamicTriageTool(server, config)
 }
 
 

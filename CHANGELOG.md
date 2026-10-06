@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.10.0] - 2026-10-06
+
+### Added
+- **Universal Dynamic AI Triage Engine (`scout_triage`)**:
+  - Direct integration with **TypeSafe Jev (System 1)** via official `@typesafe-ai/sdk`.
+  - Zero hardcoded taxonomies or schemas: calling AI agents formulate arbitrary, domain-specific criteria (`check`, `classify`, `score`) on the fly.
+  - Sub-second batch evaluation (<500ms) over compressed AST file skeletons (exports, dependencies, key signatures) in a single network round-trip.
+  - Return values include calibrated probabilities, confidence scores, and structured AST code summaries.
+- **Support for Jev Environment Variables**:
+  - `JEV_API_KEY` / `TYPESAFE_API_KEY` and optional `JEV_BASE_URL` with automatic client instantiation.
+- **AI Decision Matrix & Guidelines**:
+  - Updated `AGENTS.template.md` with explicit decision matrix directing agents when to invoke `scout_triage` vs `find_code` vs `get_file_context`.
+- Comprehensive unit tests covering AST skeleton extraction, candidate filtering, and Jev client availability.
+
+---
+
 ## [0.9.0] - 2026-08-30
 
 ### Added

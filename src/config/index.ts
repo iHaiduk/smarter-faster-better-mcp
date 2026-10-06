@@ -67,6 +67,8 @@ export function loadConfig(customEnv?: NodeJS.ProcessEnv): ScoutConfig {
   const baseUrl = env['SCOUT_BASE_URL']?.trim() || undefined
   const apiKey = env['SCOUT_API_KEY']?.trim() || undefined
   const model = env['SCOUT_MODEL']?.trim() || undefined
+  const jevApiKey = env['JEV_API_KEY']?.trim() || env['TYPESAFE_API_KEY']?.trim() || undefined
+  const jevBaseUrl = env['JEV_BASE_URL']?.trim() || undefined
 
   const num = (raw: string | undefined, fallback: number): number => {
     const parsed = Number(raw)
@@ -77,6 +79,8 @@ export function loadConfig(customEnv?: NodeJS.ProcessEnv): ScoutConfig {
     baseUrl,
     apiKey,
     model,
+    jevApiKey,
+    jevBaseUrl,
     llmTimeoutMs: num(env['SCOUT_LLM_TIMEOUT_MS'], DEFAULTS.llmTimeoutMs),
     llmParallelism: num(env['SCOUT_LLM_PARALLELISM'], DEFAULTS.llmParallelism),
     parser: getParserMode(),

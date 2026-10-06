@@ -76,27 +76,40 @@ The architecture has evolved into a highly modular, decoupled multi-pipeline eng
 
 ```mermaid
 graph TD
-    UserQuery["User Request"] --> MCPClient["AI Client (Cursor, Claude, etc.)"]
+    UserQuery["User / AI Request"] --> MCPClient["AI Client (Cursor, Claude, Gemini, etc.)"]
 
     subgraph MCP Scout Server
         MCPClient --> Tools
 
         subgraph Tools ["Exposed MCP Tools Boundaries (src/tools/)"]
+            Triage["scout_triage (Dynamic AI Criteria)"]
             FindCode["find_code"]
             TraceSymbol["trace_symbol"]
             GetContext["get_file_context"]
+            BlastRadius["blast_radius"]
+            DeadCode["dead_code"]
+            Clusters["subsystem_clusters"]
+            Diagnostics["get_diagnostics"]
             FindFiles["find_files"]
-            CleanupWorkspace["cleanup_workspace"]
             ExplainPack["explain_context_pack"]
             RefreshMap["refresh_map"]
+            CleanupWorkspace["cleanup_workspace"]
         end
 
         Tools --> Indexer{"Map Cached?"}
-        Indexer -- No --> Parser["Oxc AST Parser (TS/JS/JSON)"]
+        Indexer -- No --> Parser["Oxc AST Parser (TS/JS/JSON) & Tree-Sitter"]
         Parser --> WriteMap["Build .project_map.json"]
-        WriteMap --> QueryAnalysis["Step 1: Query Analysis (LLM)"]
-        Indexer -- Yes --> QueryAnalysis
+        WriteMap --> Dispatcher["Execution Dispatcher"]
+        Indexer -- Yes --> Dispatcher
 
+        Dispatcher -- scout_triage --> JevEngine["TypeSafe Jev (System 1 Engine)"]
+        subgraph JevPipeline ["Dynamic System-1 Triage (<500ms)"]
+            JevEngine --> ASTSkeletons["Generate AST File Skeletons (Exports, Imports, Sigs)"]
+            ASTSkeletons --> SinglePass["Batch Evaluate AI Criteria (check, classify, score)"]
+            SinglePass --> CalibratedScores["Rank by Calibrated Probabilities"]
+        end
+
+        Dispatcher -- find_code --> QueryAnalysis["Step 1: Query Analysis"]
         QueryAnalysis --> DetMatch["Step 2: Deterministic Matching"]
         DetMatch --> HighConfidence{"Confidence ≥ 0.95?"}
         HighConfidence -- Yes --> Extraction["AST Extraction"]
@@ -106,15 +119,17 @@ graph TD
         Extraction --> Budget["Apply Context Budget"]
         Budget --> ContentVal["Step 4: Content Validation"]
         ContentVal --> Formatter["Markdown / JSON Formatter"]
+        CalibratedScores --> Formatter
     end
 
-    Formatter --> AIResponse["AI Consumes Optimized Context"]
+    Formatter --> AIResponse["AI Consumes Structured, Hallucination-Free Context"]
 ```
 
 ### 📂 Directory Structure & Code Quality
 Our codebase adheres to rigorous standards (no function exceeding 20 lines, zero use of `any`, and clean SRP boundaries):
 - **`src/index.ts`**: The ultra-lean server bootstrapper (<50 lines). Loads configuration, instantiates the server, and sets up transport.
-- **`src/tools/`**: Dedicated tool boundary layer. Every tool registration (e.g. `findCodeTool.ts`, `traceSymbolTool.ts`) is fully isolated in its own file to maintain modularity.
+- **`src/tools/`**: Dedicated tool boundary layer. Every tool registration (e.g. `dynamicTriageTool.ts`, `findCodeTool.ts`, `traceSymbolTool.ts`) is fully isolated in its own file.
+- **`src/extraction/jev/`**: TypeSafe Jev System 1 integration (`client.ts` with batching, `dynamic-triage.ts` for dynamic AI-to-AST criteria negotiation).
 - **`src/shared/`**: Decoupled shared domain objects, utilities, types, and error managers (e.g. `src/shared/fs/resolveWorkspaceRoot.ts`, `src/shared/errors/errorMessage.ts`).
 - **`src/indexing/`**: Core parsing engines (`oxc-walker.ts`, `tree-sitter-walker.ts`) and path resolvers that handle module mapping and TSConfig `paths`.
 - **`src/pipeline/`**: The orchestration layers that pipeline complex workflows into clean markdown responses.
@@ -294,6 +309,82 @@ Performs Louvain community detection on the project dependency graph to discover
 ### `get_diagnostics`
 *Live LSP & Compiler Diagnostics Bridge.* Retrieves real-time semantic diagnostics (type errors, syntax errors, missing/unresolved imports) powered by TypeScript Language Service in the background.
 - **Parameters**: `file` (optional relative/absolute path), `severity` (`'error' | 'warning' | 'all'`), `limit`, `targetRoot`
+
+### `scout_triage`
+*Universal AI-to-Code Dynamic Triage Engine.* Powered by **TypeSafe Jev (System 1)**. Allows ANY external AI model (Claude, GPT, Gemini, GLM) to evaluate arbitrary, domain-specific criteria against AST candidate files in a single fast pass (<500ms) without hardcoded taxonomies or schemas.
+
+**When to use:**
+- When you are exploring a codebase and want to test architectural hypotheses before reading full files.
+- When you need to classify candidate files by custom domain tiers (e.g. `is_auth_entrypoint`, `storage_layer`, `pipeline_step`).
+- When you want to eliminate 90% of irrelevant candidate files without wasting LLM context tokens.
+
+**Parameters**:
+- `intent`: Natural language description of what you are looking for.
+- `criteria`: Map of dynamic questions formulated on the fly by the calling AI:
+  - `check`: Binary verification (`question`, optional `yesMeans`, `noMeans`) returning `yes | no | uncertain` with exact probabilities (0..1).
+  - `classify`: Categorical choice among caller-defined `options` returning choice and probability distribution.
+  - `score`: Ordered rubric evaluation along caller-defined `levels` returning calibrated score and distribution.
+- `searchHints`: Optional keyword/symbol fragments for initial coarse AST filtering (e.g. `["ast", "parse", "extract"]`).
+- `candidateFiles`: Optional explicit candidate file paths if already known.
+- `minConfidence`: Minimum combined confidence score to include candidate in response (default: `0.5`).
+- `limit`: Maximum candidates to evaluate (default: `8`).
+
+**Example Request:**
+```json
+{
+  "intent": "Find code related to syntax parsing or AST extraction",
+  "searchHints": ["ast", "parse", "extract"],
+  "criteria": {
+    "is_parser": {
+      "type": "check",
+      "question": "Does this file perform AST parsing or extraction of source code syntax trees?"
+    },
+    "layer": {
+      "type": "classify",
+      "question": "Which architectural layer does this code belong to?",
+      "options": {
+        "parsing_extraction": "Direct AST parsing or syntax extraction logic",
+        "config_utils": "General configuration or basic utility",
+        "mcp_tool": "MCP tool interface definition"
+      }
+    }
+  },
+  "limit": 3
+}
+```
+
+**Example Response:**
+```json
+{
+  "intent": "Find code related to syntax parsing or AST extraction",
+  "matches": [
+    {
+      "file": "src/extraction/extract.ts",
+      "score": 0.99,
+      "evaluations": {
+        "is_parser": {
+          "type": "check",
+          "verdict": "yes",
+          "probability": 0.98
+        },
+        "layer": {
+          "type": "classify",
+          "choice": "parsing_extraction",
+          "confidence": 1.0,
+          "probabilities": { "parsing_extraction": 1.0, "config_utils": 0, "mcp_tool": 0 }
+        }
+      },
+      "astSummary": {
+        "exports": ["extractWithOxc", "extractWithTreeSitter"],
+        "dependencies": ["oxc-parser", "web-tree-sitter"],
+        "keySignatures": ["export function extractWithOxc(...)"]
+      }
+    }
+  ],
+  "totalCandidatesEvaluated": 3,
+  "latencyMs": 1180
+}
+```
 
 ---
 
