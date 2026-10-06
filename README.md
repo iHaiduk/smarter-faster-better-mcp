@@ -36,10 +36,11 @@ Traditional codebase analysis tools force LLMs to traverse directories, read raw
 
 **MCP Scout** takes a smarter approach to performance:
 1. **Zero Native Bindings by Default**: Powered by the Rust-based `oxc-parser` for JS/TS. It installs in milliseconds without needing `node-gyp` or C++ compiler flags and parses files instantly.
-2. **Deterministic String Filtering**: Employs rapid Jaro-Winkler edit distance and stop-word filtering to narrow down thousands of project symbols to the most relevant candidates instantly before hitting the LLM.
-3. **LLM Chunk Parallelism**: Chunks the compact symbol map and distributes requests in parallel. This enables inexpensive, local, and low-latency LLMs to categorize symbols accurately without context limits.
+2. **Sub-Second System 1 AI Triage (TypeSafe Jev)**: Replaces slow, resource-heavy local chat LLMs with TypeSafe Jev. Evaluates dynamic AI criteria and hypothesis matrices in single-pass batches (<500ms) with zero hallucination.
+3. **Deterministic String & AST Filtering**: Employs rapid Jaro-Winkler edit distance and stop-word filtering to narrow down thousands of project symbols to the most relevant candidates instantly before hitting AI.
 4. **AST Extraction & Code Collapsing**: Extracts precise function and class bodies directly via AST parsing. The `summaryOnly` mode collapses bodies into stubs, retaining context while saving up to 90% of tokens.
 5. **AST + Regex Dependency Mapping**: Automatically traces exact dependency imports through AST analysis and crawls the workspace using `ripgrep` (`rg`) for rapid fallback symbol mapping.
+
 
 <a id="supported-file-types-parser-engines"></a>
 
@@ -176,32 +177,39 @@ bun add smarter-faster-better-mcp
 
 ## ⚙️ Configuration
 
-The server expects configuration parameters via environment variables.
+The server automatically loads configuration parameters from your environment and local `.env` files.
 
 ### 🌟 Recommended Setup (.env file)
-Starting with version `0.4.0`, **MCP Scout** automatically loads configuration from a `.env` file located in the current working directory (`process.cwd()`) where the server is launched (i.e. your active project directory). This allows you and your team to configure their own LLM preferences without hardcoding them into client configs or committing them to git.
+Starting with version `0.10.0`, **MCP Scout** integrates **TypeSafe Jev (System 1)** for sub-second, typed code triage, eliminates the need for slow local LLMs, and automatically loads `.env` located in the current working directory (`process.cwd()`).
 
-Simply create a `.env` file in the root of your project:
+Simply configure your `.env` in the root of your project:
 ```env
-SCOUT_BASE_URL=http://localhost:11434/v1
-SCOUT_API_KEY=ollama
-SCOUT_MODEL=llama3.1:8b
-SCOUT_LLM_PARALLELISM=2
+# TypeSafe Jev System 1 (Recommended for sub-second dynamic triage)
+JEV_API_KEY=apikey_your_typesafe_key_here
+
+# Optional: Legacy Chat LLM fallback (Ollama / OpenAI / LM Studio)
+# SCOUT_BASE_URL=http://localhost:11434/v1
+# SCOUT_API_KEY=ollama
+# SCOUT_MODEL=llama3.1:8b
+# SCOUT_LLM_PARALLELISM=2
 ```
 
-Add `.env` to your `.gitignore` to keep configurations private.
+Add `.env` to your `.gitignore` to keep API keys secure and private.
 
 ### Available Variables
 
-| Variable | Description | Default | Required |
+| Variable | Description | Default | Recommended / Purpose |
 | :--- | :--- | :--- | :--- |
-| `SCOUT_BASE_URL` | Endpoint of your LLM provider (e.g. Ollama, OpenAI, LM Studio) | - | No (Offline AST by default) |
-| `SCOUT_API_KEY` | API Key for authorization (`ollama` for Ollama) | - | No (Offline AST by default) |
-| `SCOUT_MODEL` | LLM model name (e.g. `llama3.1:8b`, `gpt-4o-mini`) | - | No (Offline AST by default) |
-| `SCOUT_LLM_TIMEOUT_MS` | Max wait time for LLM classification | `30000` | No |
-| `SCOUT_LLM_PARALLELISM` | Number of concurrent requests sent to local LLM | `2` | No |
+| `JEV_API_KEY` (or `TYPESAFE_API_KEY`) | API Key for TypeSafe Jev (System 1 model) | - | **Recommended** for sub-second code & hypothesis triage (`scout_triage`) |
+| `JEV_BASE_URL` | Custom endpoint for TypeSafe Jev API | `https://api.typesafe.ai` | No (default is official API) |
+| `SCOUT_BASE_URL` | Endpoint of legacy chat LLM provider (Ollama, OpenAI, LM Studio) | - | Optional (Offline AST by default) |
+| `SCOUT_API_KEY` | API Key for legacy chat LLM provider | - | Optional |
+| `SCOUT_MODEL` | Legacy LLM model name (e.g. `llama3.1:8b`, `gpt-4o-mini`) | - | Optional |
+| `SCOUT_LLM_TIMEOUT_MS` | Max wait time for legacy LLM requests | `30000` | No |
+| `SCOUT_LLM_PARALLELISM` | Number of concurrent requests sent to legacy LLM | `2` | No |
 | `SCOUT_PARSER` | Parser mode: `auto` (detects non-JS/TS files), `oxc`, or `tree-sitter` | `auto` | No |
 | `SCOUT_WORKSPACE_ROOT` | Override target workspace directory path | Auto-discovered | No |
+
 
 You can also force a specific parser mode with a CLI flag:
 
