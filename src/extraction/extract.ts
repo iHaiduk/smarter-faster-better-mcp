@@ -8,6 +8,7 @@ import { extractName, getBodyStartOffset, getLineFromOffset, walkAst } from '../
 import { isIdentifier } from '../shared/types/index.js'
 import { createTreeSitterParser, findTreeSitterNameNode, getTreeSitterLanguage } from '../indexing/parser/tree-sitter-runtime.js'
 import { getParserMode } from '../config/index.js'
+import { getParserEngineForFile } from '../shared/constants/extensions.js'
 import { fileExists } from '../shared/utils/node.js'
 import {
   extractFallback,
@@ -222,22 +223,22 @@ export async function extractWithOxc(
   targetRoot = process.cwd(),
 ): Promise<ExtractedSymbol> {
   const parserMode = getParserMode()
-  const ext = path.extname(candidate.file).toLowerCase()
-  const isJsTs = ext === '.ts' || ext === '.tsx' || ext === '.js' || ext === '.jsx'
+  const engine = getParserEngineForFile(candidate.file, parserMode)
 
-  if (!isJsTs) {
-    if (parserMode !== 'tree-sitter') {
-      return {
-        candidate,
-        code: `[Unsupported parser mode for ${candidate.file}: enable --parser tree-sitter to inspect non-JS/TS files]`,
-        signature: '',
-        doc: '',
-        imports: [],
-        importedBy: [],
-        extractionOk: false,
-      }
-    }
+  if (engine === 'tree-sitter') {
     return extractWithTreeSitter(candidate, map, summaryOnly, targetRoot)
+  }
+
+  if (!engine) {
+    return {
+      candidate,
+      code: `[Unsupported parser mode for ${candidate.file}: enable --parser tree-sitter or verify file extension]`,
+      signature: '',
+      doc: '',
+      imports: [],
+      importedBy: [],
+      extractionOk: false,
+    }
   }
 
   const absPath = path.join(targetRoot, candidate.file)

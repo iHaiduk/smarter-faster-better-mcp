@@ -98,18 +98,7 @@ export async function buildMap(targetRoot = process.cwd()): Promise<ProjectMap> 
   const configuredParserMode = getParserMode()
   const files = await getProjectFiles(targetRoot, configuredParserMode)
 
-  let effectiveParserMode: 'oxc' | 'tree-sitter'
-  if (configuredParserMode === 'auto') {
-    const hasNonJsTsFiles = files.some((f) => {
-      const ext = path.extname(f).toLowerCase()
-      return ext !== '.ts' && ext !== '.tsx' && ext !== '.js' && ext !== '.jsx' && ext !== '.json'
-    })
-    effectiveParserMode = hasNonJsTsFiles ? 'tree-sitter' : 'oxc'
-  } else {
-    effectiveParserMode = configuredParserMode
-  }
-
-  console.error(`[Scout] Building map (${effectiveParserMode}${configuredParserMode === 'auto' ? ' [auto-detected]' : ''}) for ${files.length} files under ${targetRoot}...`)
+  console.error(`[Scout] Building map (dynamic multi-language) for ${files.length} files under ${targetRoot}...`)
 
   const tsconfig = await loadTsConfigPaths(targetRoot)
   const allSymbols: SymbolEntry[] = []
@@ -118,7 +107,7 @@ export async function buildMap(targetRoot = process.cwd()): Promise<ProjectMap> 
   for (let i = 0; i < files.length; i += PARSE_CHUNK_SIZE) {
     const chunk = files.slice(i, i + PARSE_CHUNK_SIZE)
     const results = await Promise.all(
-      chunk.map((f) => parseFile(f, targetRoot, effectiveParserMode, tsconfig.paths, tsconfig.baseUrl)),
+      chunk.map((f) => parseFile(f, targetRoot, 'auto', tsconfig.paths, tsconfig.baseUrl)),
     )
     for (const res of results) {
       allSymbols.push(...res.symbols)
@@ -132,7 +121,7 @@ export async function buildMap(targetRoot = process.cwd()): Promise<ProjectMap> 
 
   const map: ProjectMap = {
     generatedAt: Date.now(),
-    parserMode: effectiveParserMode,
+    parserMode: 'auto',
     symbolsCount: Math.min(allSymbols.length, MAX_SYMBOLS),
     symbols: allSymbols.slice(0, MAX_SYMBOLS),
     files: filesMetadata,

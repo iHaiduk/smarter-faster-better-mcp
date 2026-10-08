@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.10.1] - 2026-10-08
+
+### Fixed & Improved
+- **Automatic Dynamic Multi-Language Parser Engine Dispatching**:
+  - Removed static `parserMode` gating that caused non-JS/TS files (`.py`, `.go`, `.rs`, `.dart`, etc.) to fail extraction with `[Unsupported parser mode...]` in default mode.
+  - File scanner now automatically covers all supported source extensions by default across git, filesystem, and watcher discovery.
+  - Dynamically routes each individual file to the optimal engine based on extension:
+    - `.json` files -> fast native JSON scanner
+    - `.ts`, `.tsx`, `.js`, `.jsx` -> ultra-fast OXC Rust parser
+    - Other code files (`.py`, `.go`, `.rs`, `.dart`, `.rb`, `.java`, `.cpp`, `.c`, `.cs`, `.php`) -> Tree-Sitter
+  - Cache keying now reflects the effective engine applied per file, avoiding cache conflicts and skipping legacy error entries on read.
+
+---
+
 ## [0.10.0] - 2026-10-06
 
 ### Added

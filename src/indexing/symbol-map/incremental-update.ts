@@ -5,7 +5,7 @@ import { parseFile } from '../parser/oxc-walker.js'
 import { loadTsConfigPaths } from '../resolver/tsconfig-paths.js'
 import { findDepsStructured } from '../../dependency-resolver/deps.js'
 import { l1Cache } from '../../cache/l1.js'
-import { getMapFilePath, getParserMode } from '../../config/index.js'
+import { getMapFilePath } from '../../config/index.js'
 import type { FileMetadata, ParserMode, ProjectMap } from '../../shared/types/index.js'
 
 export interface IncrementalFileChange {
@@ -21,14 +21,9 @@ export async function applyIncrementalChanges(
   currentMap: ProjectMap,
   changes: readonly IncrementalFileChange[],
   targetRoot: string,
-  _configuredParserMode: ParserMode = getParserMode(),
+  _configuredParserMode: ParserMode = 'auto',
 ): Promise<ProjectMap> {
   if (changes.length === 0) return currentMap
-
-  const effectiveParserMode: 'oxc' | 'tree-sitter' =
-    currentMap.parserMode && currentMap.parserMode !== 'auto'
-      ? currentMap.parserMode
-      : 'oxc'
 
   const tsconfig = await loadTsConfigPaths(targetRoot)
 
@@ -72,7 +67,7 @@ export async function applyIncrementalChanges(
       const parseRes = await parseFile(
         relFile,
         targetRoot,
-        effectiveParserMode,
+        'auto',
         tsconfig.paths,
         tsconfig.baseUrl,
       )
@@ -112,7 +107,7 @@ export async function applyIncrementalChanges(
   const updatedFiles = Array.from(fileMetaMap.values())
   const newMap: ProjectMap = {
     generatedAt: Date.now(),
-    parserMode: effectiveParserMode,
+    parserMode: 'auto',
     symbolsCount: symbols.length,
     symbols,
     files: updatedFiles,

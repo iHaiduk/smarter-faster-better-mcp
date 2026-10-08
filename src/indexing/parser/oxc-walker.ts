@@ -9,6 +9,7 @@ import { cleanJsonText, parseJsonFile } from './json-parser.js'
 import { parseFileWithTreeSitter } from './tree-sitter-walker.js'
 import { resolveModulePath } from '../resolver/module-resolver.js'
 import { isAstNode, isIdentifier, SYMBOL_KINDS } from '../../shared/types/index.js'
+import { getParserEngineForFile } from '../../shared/constants/extensions.js'
 import { fileExists } from '../../shared/utils/node.js'
 
 import type {
@@ -197,10 +198,12 @@ export async function parseFile(
     }
 
     const ext = path.extname(relPath).toLowerCase()
-    const isJsTs = ext === '.ts' || ext === '.tsx' || ext === '.js' || ext === '.jsx'
+    const engine = getParserEngineForFile(relPath, parserMode)
+    if (!engine) {
+      return { symbols: [], metadata: defaultMeta }
+    }
 
-    if (!isJsTs) {
-      if (parserMode !== 'tree-sitter') return { symbols: [], metadata: defaultMeta }
+    if (engine === 'tree-sitter') {
       return await parseFileWithTreeSitter(source, relPath, ext)
     }
 

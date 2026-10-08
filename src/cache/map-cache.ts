@@ -49,10 +49,10 @@ export async function lookupCached(
 ): Promise<ExtractedSymbol | null> {
   const key = l1Key(candidate.file, candidate.symbol, summaryOnly)
   const inMemory = l1Cache.get(key)
-  if (inMemory) return inMemory
+  if (inMemory && inMemory.extractionOk !== false) return inMemory
 
   const onDisk = await l2Get(candidate.file, candidate.symbol, summaryOnly, targetRoot)
-  if (onDisk) {
+  if (onDisk && onDisk.extractionOk !== false) {
     l1Cache.set(key, onDisk)
     return onDisk
   }

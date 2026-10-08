@@ -39,6 +39,21 @@ describe('Integration: OXC Extraction', () => {
     )
     expect(result.extractionOk).toBe(false)
   })
+
+  test('dynamically dispatches non-JS/TS files to tree-sitter in auto mode', async () => {
+    const map: ProjectMap = {
+      symbols: [{ name: 'test_func', kind: FN_KIND, line: 1, file: 'test_sample.py', signature: 'def test_func():', doc: '' }],
+      files: [],
+      symbolsCount: 1,
+      generatedAt: 0,
+    }
+    // Non-existent python file returns graceful extraction failure (missingFileResult) rather than Unsupported parser mode error
+    const result = await extractWithOxc(
+      { file: 'test_sample.py', symbol: 'test_func', confidence: 0.9 },
+      map,
+    )
+    expect(result.code).not.toContain('Unsupported parser mode')
+  })
 })
 
 describe('Integration: Deterministic Matching', () => {

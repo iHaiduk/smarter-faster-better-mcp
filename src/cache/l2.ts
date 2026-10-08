@@ -39,6 +39,8 @@ export async function l2Get(
     const entry = JSON.parse(raw) as { readonly sourceMtimeMs: number; readonly value: ExtractedSymbol }
     const mtime = await getSourceMtime(file, targetRoot)
     if (mtime === null || mtime > entry.sourceMtimeMs) return null
+    // If a previous extraction failed (e.g. unsupported parser error in old cache), ignore and re-extract
+    if (entry.value?.extractionOk === false) return null
     return entry.value
   } catch {
     return null

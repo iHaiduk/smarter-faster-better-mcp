@@ -53,9 +53,8 @@ export function getParserMode(argv: readonly string[] = process.argv): ParserMod
   return normalizeParserMode(process.env['SCOUT_PARSER']) ?? 'auto'
 }
 
-export function projectMapMatchesParserMode(map: ProjectMap, parserMode = getParserMode()): boolean {
-  if (parserMode === 'auto') return true
-  return map.parserMode === parserMode
+export function projectMapMatchesParserMode(_map?: ProjectMap, _parserMode?: ParserMode): boolean {
+  return true
 }
 
 /** Loads Scout configuration from environment variables and CLI flags. */
