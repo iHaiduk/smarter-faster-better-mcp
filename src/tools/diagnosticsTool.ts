@@ -1,14 +1,18 @@
+import * as path from 'node:path'
 import { z } from 'zod'
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { TypeScriptDiagnosticsService } from '../lsp/ts-diagnostics.js'
 
-let diagnosticsService: TypeScriptDiagnosticsService | null = null
+const diagnosticsServices = new Map<string, TypeScriptDiagnosticsService>()
 
 export function getDiagnosticsService(targetRoot = process.cwd()): TypeScriptDiagnosticsService {
-  if (!diagnosticsService) {
-    diagnosticsService = new TypeScriptDiagnosticsService(targetRoot)
+  const normalizedRoot = path.resolve(targetRoot)
+  let service = diagnosticsServices.get(normalizedRoot)
+  if (!service) {
+    service = new TypeScriptDiagnosticsService(normalizedRoot)
+    diagnosticsServices.set(normalizedRoot, service)
   }
-  return diagnosticsService
+  return service
 }
 
 export function registerDiagnosticsTool(server: McpServer): void {

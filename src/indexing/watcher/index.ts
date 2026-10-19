@@ -9,9 +9,13 @@ export function getWorkspaceWatcher(targetRoot = process.cwd(), initialMap?: Pro
     activeWatcher = new WorkspaceWatcher(targetRoot, initialMap)
     
     // Wire up LSP Diagnostics syncing with watcher events
-    activeWatcher.onMapUpdate((map) => {
+    activeWatcher.onMapUpdate((map, changedFiles) => {
       const diagService = getDiagnosticsService(targetRoot)
-      if (map.files) {
+      if (changedFiles && changedFiles.length > 0) {
+        for (const file of changedFiles) {
+          void diagService.syncFile(file)
+        }
+      } else if (map.files) {
         for (const fileMeta of map.files) {
           void diagService.syncFile(fileMeta.file)
         }

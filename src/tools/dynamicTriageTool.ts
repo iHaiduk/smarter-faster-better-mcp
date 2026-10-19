@@ -90,5 +90,6 @@ export function registerDynamicTriageTool(server: McpServer, config: ScoutConfig
     }
   }
 
+  server.tool('triage', DESCRIPTION, SCHEMA, handler)
   server.tool('scout_triage', DESCRIPTION, SCHEMA, handler)
 }

@@ -1,6 +1,6 @@
 {
   "name": "smarter-faster-better-mcp",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "description": "Blazing fast AST-based MCP code search using OXC with optional Tree-sitter polyglot parsing",
   "keywords": [
     "mcp",
@@ -45,22 +45,22 @@
     "verify:pack": "node ./scripts/verify-packed-entry.mjs"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.30.0",
-    "@repomix/tree-sitter-wasms": "^0.1.17",
-    "@typesafe-ai/sdk": "^0.6.0",
-    "chokidar": "^4.0.3",
-    "dotenv": "^17.4.2",
-    "oxc-parser": "^0.147.0",
-    "ts-morph": "^25.0.1",
-    "web-tree-sitter": "^0.26.13",
-    "zod": "^4.5.2"
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@repomix/tree-sitter-wasms": "0.1.17",
+    "@typesafe-ai/sdk": "0.7.0",
+    "chokidar": "5.0.0",
+    "dotenv": "18.0.8",
+    "oxc-parser": "0.154.0",
+    "ts-morph": "28.0.0",
+    "web-tree-sitter": "0.27.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
-    "@eslint/js": "^10.0.1",
-    "@types/bun": "^1.4.0",
-    "@types/node": "^26.4.0",
-    "eslint": "^10.9.1",
-    "typescript": "^5.8.2",
-    "typescript-eslint": "^8.68.0"
+    "@eslint/js": "10.0.1",
+    "@types/bun": "1.4.3",
+    "@types/node": "26.6.5",
+    "eslint": "10.13.0",
+    "typescript": "7.0.2",
+    "typescript-eslint": "8.71.2"
   }
 }

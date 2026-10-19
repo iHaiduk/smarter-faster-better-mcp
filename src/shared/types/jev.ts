@@ -8,8 +8,8 @@ export interface JevClassifyResponse {
   readonly action?: JevAction
   readonly model?: string
   readonly usage?: {
-    readonly input_tokens: number
-    readonly output_tokens: number
+    readonly input_tokens: number | null
+    readonly output_tokens: number | null
   }
   readonly latency_ms?: number
 }
@@ -19,8 +19,8 @@ export interface JevCheckResponse {
   readonly probability_yes: number
   readonly model?: string
   readonly usage?: {
-    readonly input_tokens: number
-    readonly output_tokens: number
+    readonly input_tokens: number | null
+    readonly output_tokens: number | null
   }
   readonly latency_ms?: number
 }
@@ -31,8 +31,8 @@ export interface JevScoreResponse {
   readonly distribution: Record<string, number>
   readonly model?: string
   readonly usage?: {
-    readonly input_tokens: number
-    readonly output_tokens: number
+    readonly input_tokens: number | null
+    readonly output_tokens: number | null
   }
   readonly latency_ms?: number
 }

@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.10.2] - 2026-10-19
+
+### Fixed & Improved
+- **Dependency Upgrades & Exact Version Pinning**:
+  - Upgraded `@modelcontextprotocol/sdk` to `1.32.1`, resolving JSON Schema serialization crash (`tools/list: Cannot read properties of undefined (reading 'push')`) when evaluating complex Zod v4 schemas in `scout_triage`.
+  - Upgraded `zod` to `4.6.7`, `@typesafe-ai/sdk` to `0.7.0`, `chokidar` to `5.0.0`, `dotenv` to `18.0.8`, `oxc-parser` to `0.154.0`, `ts-morph` to `28.0.0`, and `web-tree-sitter` to `0.27.1`.
+  - Pinned all dependencies to exact versions without loose `^` ranges for deterministic builds.
+- **Cache & Performance Optimizations**:
+  - Eliminated full-workspace re-indexing on uncommitted git working trees in `isCacheStale`.
+  - Optimized file watcher update listeners to notify only changed files, preventing LSP diagnostic sync spikes.
+  - Multi-root isolated diagnostics caching in `TypeScriptDiagnosticsService`.
+  - Added symmetrical `triage` alias for `scout_triage` and integration tests for MCP schema serialization.
+
+---
+
 ## [0.10.1] - 2026-10-08
 
 ### Fixed & Improved

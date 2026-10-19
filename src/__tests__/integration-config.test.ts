@@ -140,3 +140,35 @@ describe('Integration: Map Building', () => {
     expect(typeof sym.file).toBe('string')
   })
 })
+
+describe('Integration: MCP Tool Registration & Serialization', () => {
+  test('all registered MCP tools serialize correctly for tools/list', async () => {
+    const { McpServer } = await import('@modelcontextprotocol/sdk/server/mcp.js')
+    const { registerAllTools } = await import('../tools/registerTools.js')
+    const { InMemoryTransport } = await import('@modelcontextprotocol/sdk/inMemory.js')
+    const { Client } = await import('@modelcontextprotocol/sdk/client/index.js')
+
+    const server = new McpServer({ name: 'mcp-scout-test', version: '1.0.0' })
+    registerAllTools(server, loadConfig())
+
+    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair()
+    const client = new Client({ name: 'test-client', version: '1.0.0' }, { capabilities: {} })
+
+    await server.connect(serverTransport)
+    await client.connect(clientTransport)
+
+    const list = await client.listTools()
+    expect(list.tools.length).toBeGreaterThanOrEqual(23)
+
+    const triageTool = list.tools.find((t) => t.name === 'triage')
+    const scoutTriageTool = list.tools.find((t) => t.name === 'scout_triage')
+    expect(triageTool).toBeDefined()
+    expect(scoutTriageTool).toBeDefined()
+    expect(scoutTriageTool?.inputSchema).toBeDefined()
+    expect(scoutTriageTool?.inputSchema.properties?.['criteria']).toBeDefined()
+
+    await client.close()
+    await server.close()
+  })
+})
+

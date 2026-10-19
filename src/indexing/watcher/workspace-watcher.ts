@@ -11,8 +11,8 @@ import type { ProjectMap } from '../../shared/types/index.js'
 const BATCH_OVERFLOW_THRESHOLD = 35
 const DEBOUNCE_MS = 200
 
-export type MapUpdateListener = (newMap: ProjectMap) => void
-
+export type MapUpdateListener = (newMap: ProjectMap, changedFiles?: readonly string[]) => void
+ 
 export class WorkspaceWatcher {
   private watcher: ReturnType<typeof chokidar.watch> | null = null
   private pendingChanges = new Map<string, 'add' | 'change' | 'unlink'>()
@@ -43,10 +43,10 @@ export class WorkspaceWatcher {
     return () => this.listeners.delete(listener)
   }
 
-  private notifyListeners(map: ProjectMap): void {
+  private notifyListeners(map: ProjectMap, changedFiles?: readonly string[]): void {
     for (const listener of this.listeners) {
       try {
-        listener(map)
+        listener(map, changedFiles)
       } catch (err) {
         console.error('[Scout Watcher] Listener error:', err)
       }
@@ -132,7 +132,7 @@ export class WorkspaceWatcher {
           this.targetRoot,
         )
       }
-      this.notifyListeners(this.currentMap)
+      this.notifyListeners(this.currentMap, changeList.map((c) => c.path))
     } catch (err) {
       console.error('[Scout Watcher] Failed to process file changes:', err)
     } finally {

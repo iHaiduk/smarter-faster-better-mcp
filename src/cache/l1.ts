@@ -60,17 +60,7 @@ export async function isCacheStale(targetRoot: string): Promise<boolean> {
     return true
   }
 
-  // Check git worktree for uncommitted changes — this catches staged, modified,
-  // and untracked files that the find-based check would miss.
-  try {
-    const status = await runCommand(['git', 'status', '--porcelain', '--short'], targetRoot)
-    if (status.trim().length > 0) {
-      console.error('[Scout] Cache stale: git worktree has uncommitted changes')
-      return true
-    }
-  } catch {
-    // Not a git repo — continue with other checks
-  }
+
 
   try {
     // `find ... -quit` stops on the first match for speed.
