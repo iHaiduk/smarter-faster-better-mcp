@@ -99,6 +99,9 @@ export class TypeScriptDiagnosticsService {
     for (const sf of sourceFiles) {
       const diagnostics = sf.getPreEmitDiagnostics()
       for (const diag of diagnostics) {
+        // TS1470 is a false-positive in ts-morph under NodeNext ESM where in-memory SourceFiles lack impliedNodeFormat
+        if (diag.getCode() === 1470) continue
+
         const cat = diag.getCategory()
         let categoryStr: DiagnosticItem['category'] = 'error'
         if (cat === DiagnosticCategory.Warning) categoryStr = 'warning'

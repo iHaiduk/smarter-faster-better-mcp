@@ -10,6 +10,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { loadConfig } from './config/index.js'
 import { registerAllTools } from './tools/registerTools.js'
 import { getWorkspaceWatcher, stopWorkspaceWatcher } from './indexing/watcher/index.js'
+import { isJevAvailable } from './extraction/jev/client.js'
 
 const requireUtil = createRequire(import.meta.url)
 const PACKAGE_JSON_PATH = '../package.json'
@@ -30,10 +31,9 @@ async function initializeServer(): Promise<void> {
   const config = loadConfig()
   const mcpServer = new McpServer({ name: SERVER_NAME, version: SCOUT_VERSION })
   
-  const hasLlm = Boolean(config.baseUrl && config.apiKey && config.model)
   console.error(`[Scout] Parser mode: ${config.parser}`)
-  if (hasLlm) {
-    console.error(`[Scout] LLM connected: ${config.model} (${config.baseUrl})`)
+  if (isJevAvailable(config)) {
+    console.error('[Scout] TypeSafe Jev System-1 active')
   } else {
     console.error('[Scout] Running in Zero-Config Local AST mode (deterministic & offline)')
   }

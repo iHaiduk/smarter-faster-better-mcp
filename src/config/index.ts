@@ -1,4 +1,6 @@
 import * as path from 'node:path'
+import * as fs from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import dotenv from 'dotenv'
 
 import type { ParserMode, ProjectMap, ScoutConfig } from '../shared/types/index.js'
@@ -13,13 +15,21 @@ export const getMapFilePath = (targetRoot: string): string => path.join(targetRo
 export const getCacheDir = (targetRoot: string): string => path.join(targetRoot, '.scout-cache')
 
 export const MAX_SYMBOLS = 50000
-export const MAX_SYMBOLS_FOR_LLM = 150
 export const PARSE_CHUNK_SIZE = 20
 
-const DEFAULTS = {
-  llmTimeoutMs: 30_000,
-  llmParallelism: 2,
-} as const
+function findPackageRoot(): string {
+  if (process.env['SCOUT_PACKAGE_DIR']) {
+    return process.env['SCOUT_PACKAGE_DIR']
+  }
+  let dir = path.dirname(fileURLToPath(import.meta.url))
+  while (dir !== path.dirname(dir)) {
+    if (fs.existsSync(path.join(dir, 'package.json'))) {
+      return dir
+    }
+    dir = path.dirname(dir)
+  }
+  return process.cwd()
+}
 
 function normalizeParserMode(raw: string | undefined): ParserMode | null {
   if (!raw) return null
@@ -60,28 +70,19 @@ export function projectMapMatchesParserMode(_map?: ProjectMap, _parserMode?: Par
 /** Loads Scout configuration from environment variables and CLI flags. */
 export function loadConfig(customEnv?: NodeJS.ProcessEnv): ScoutConfig {
   if (!customEnv) {
+    // Load cwd .env first, then package-root .env as fallback (process.env still wins)
     dotenv.config({ quiet: true })
+    const pkgRoot = findPackageRoot()
+    const pkgEnvPath = path.join(pkgRoot, '.env')
+    dotenv.config({ path: pkgEnvPath, quiet: true })
   }
   const env = customEnv ?? process.env
-  const baseUrl = env['SCOUT_BASE_URL']?.trim() || undefined
-  const apiKey = env['SCOUT_API_KEY']?.trim() || undefined
-  const model = env['SCOUT_MODEL']?.trim() || undefined
   const jevApiKey = env['JEV_API_KEY']?.trim() || env['TYPESAFE_API_KEY']?.trim() || undefined
   const jevBaseUrl = env['JEV_BASE_URL']?.trim() || undefined
 
-  const num = (raw: string | undefined, fallback: number): number => {
-    const parsed = Number(raw)
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
-  }
-
   return {
-    baseUrl,
-    apiKey,
-    model,
     jevApiKey,
     jevBaseUrl,
-    llmTimeoutMs: num(env['SCOUT_LLM_TIMEOUT_MS'], DEFAULTS.llmTimeoutMs),
-    llmParallelism: num(env['SCOUT_LLM_PARALLELISM'], DEFAULTS.llmParallelism),
     parser: getParserMode(),
   } satisfies ScoutConfig
 }

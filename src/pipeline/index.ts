@@ -14,7 +14,6 @@ import { findDeps } from '../dependency-resolver/deps.js'
 import { buildMap } from '../indexing/symbol-map/build-map.js'
 import { resolveBudget } from '../shared/constants/budget.js'
 import { parseCustomQuery, runCustomSearch } from '../extraction/custom-search/searcher.js'
-import { analyzeQuery } from '../extraction/query-analyzer.js'
 import { readMap } from '../cache/map-cache.js'
 import { resolveSecurePath } from './resolve-path.js'
 import { selectCoarseCandidates, jevFilterCandidates } from '../extraction/jev/dynamic-triage.js'
@@ -287,13 +286,9 @@ export async function runFindCodePipeline(
 
   // 1. Extract search terms & identifiers
   const terms = extractTaskTerms(task)
-  const analysis = await analyzeQuery(task, config).catch(() => null)
-  if (analysis?.symbolNames) {
-    terms.push(...analysis.symbolNames)
-  }
 
   // 2. Deterministic candidate check
-  const deterministicCandidates = getDeterministicMatches(map, task, resolvedBudget.includeTests, analysis)
+  const deterministicCandidates = getDeterministicMatches(map, task, resolvedBudget.includeTests)
   const deterministicFiles = [...new Set(deterministicCandidates.map((c) => c.file))]
 
   // 3. Coarse candidate selection (up to 8 files)

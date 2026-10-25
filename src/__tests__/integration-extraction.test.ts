@@ -3,7 +3,6 @@ import { extractWithOxc } from '../extraction/extract.js'
 import { filterMap, getDeterministicMatches } from '../extraction/matcher/filter.js'
 import { findDeps } from '../dependency-resolver/deps.js'
 import { globToRegex, matchGlob, normalizePath } from '../shared/utils/glob.js'
-import { buildEndpoint } from '../shared/utils/llm-client.js'
 import { cleanJSON } from '../shared/utils/json.js'
 import { shouldIgnorePath } from '../shared/constants/ignore-rules.js'
 import type { ProjectMap, SymbolKind } from '../shared/types/index.js'
@@ -132,16 +131,6 @@ describe('Integration: Shared Utilities', () => {
 
   test('normalizePath converts backslashes', () => {
     expect(normalizePath('src\\utils\\file.ts')).toBe('src/utils/file.ts')
-  })
-
-  test('buildEndpoint creates correct URL', () => {
-    const url = buildEndpoint('http://localhost:1234/v1')
-    expect(url.toString()).toBe('http://localhost:1234/v1/chat/completions')
-  })
-
-  test('buildEndpoint handles trailing slash', () => {
-    const url = buildEndpoint('http://localhost:1234/v1/')
-    expect(url.toString()).toBe('http://localhost:1234/v1/chat/completions')
   })
 
   test('cleanJSON extracts JSON from markdown fences', () => {

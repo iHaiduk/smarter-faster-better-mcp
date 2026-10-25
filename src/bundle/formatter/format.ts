@@ -87,7 +87,7 @@ export function formatDegraded(reason: string): string {
     '',
     'Retry find_code once with the same task before falling back to filesystem search.',
     'Only use grep/glob/list_dir/read_file after two failed or degraded Scout attempts.',
-    'Check SCOUT_BASE_URL and that your local LLM is running.',
+    'Check JEV_API_KEY configuration or use deterministic fallback mode.',
   ].join('\n')
 }
 

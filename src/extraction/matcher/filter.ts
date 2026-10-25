@@ -1,9 +1,10 @@
 import * as path from 'node:path'
-import { MAX_SYMBOLS_FOR_LLM, STOP_WORDS } from '../../config/index.js'
+import { STOP_WORDS } from '../../config/index.js'
 import { isTestFile } from '../../shared/constants/test-suffixes.js'
 
 import type { ProjectMap, SymbolEntry, LLMCandidate, QueryAnalysis } from '../../shared/types/index.js'
 
+const MAX_SYMBOLS_FILTER_MAP = 150
 const MIN_KEYWORD_LEN = 3
 const FUZZY_MIN_WORD_LEN = 4
 const FUZZY_MAX_DISTANCE = 1
@@ -167,7 +168,7 @@ export function filterMap(
   const allKeywords = [...keywords, ...expandedKeywords]
   const allExactIds = [...exactIdentifiers, ...symbolNames]
   if (allKeywords.length === 0 && filePatterns.length === 0 && allExactIds.length === 0) {
-    return map.symbols.slice(0, MAX_SYMBOLS_FOR_LLM)
+    return map.symbols.slice(0, MAX_SYMBOLS_FILTER_MAP)
   }
 
   const scored = map.symbols
@@ -199,10 +200,10 @@ export function filterMap(
     .map(({ sym }) => sym)
 
   const result = scored.length > 0 ? scored : [...map.symbols]
-  if (result.length > MAX_SYMBOLS_FOR_LLM) {
-    console.error(`[Scout] Truncating filtered map ${result.length} → ${MAX_SYMBOLS_FOR_LLM}`)
+  if (result.length > MAX_SYMBOLS_FILTER_MAP) {
+    console.error(`[Scout] Truncating filtered map ${result.length} → ${MAX_SYMBOLS_FILTER_MAP}`)
   }
-  return result.slice(0, MAX_SYMBOLS_FOR_LLM)
+  return result.slice(0, MAX_SYMBOLS_FILTER_MAP)
 }
 
 function cleanCasing(str: string): string {

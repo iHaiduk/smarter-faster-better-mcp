@@ -184,14 +184,10 @@ Starting with version `0.10.0`, **MCP Scout** integrates **TypeSafe Jev (System 
 
 Simply configure your `.env` in the root of your project:
 ```env
-# TypeSafe Jev System 1 (Recommended for sub-second dynamic triage)
+# TypeSafe Jev System 1 (Recommended for sub-second dynamic triage & candidate filtering)
 JEV_API_KEY=apikey_your_typesafe_key_here
-
-# Optional: Legacy Chat LLM fallback (Ollama / OpenAI / LM Studio)
-# SCOUT_BASE_URL=http://localhost:11434/v1
-# SCOUT_API_KEY=ollama
-# SCOUT_MODEL=llama3.1:8b
-# SCOUT_LLM_PARALLELISM=2
+# JEV_BASE_URL=https://api.typesafe.ai
+# SCOUT_PARSER=auto
 ```
 
 Add `.env` to your `.gitignore` to keep API keys secure and private.
@@ -200,13 +196,8 @@ Add `.env` to your `.gitignore` to keep API keys secure and private.
 
 | Variable | Description | Default | Recommended / Purpose |
 | :--- | :--- | :--- | :--- |
-| `JEV_API_KEY` (or `TYPESAFE_API_KEY`) | API Key for TypeSafe Jev (System 1 model) | - | **Recommended** for sub-second code & hypothesis triage (`triage`) |
+| `JEV_API_KEY` (or `TYPESAFE_API_KEY`) | API Key for TypeSafe Jev (System 1 model) | - | **Recommended** for sub-second code & hypothesis triage and candidate filtering |
 | `JEV_BASE_URL` | Custom endpoint for TypeSafe Jev API | `https://api.typesafe.ai` | No (default is official API) |
-| `SCOUT_BASE_URL` | Endpoint of legacy chat LLM provider (Ollama, OpenAI, LM Studio) | - | Optional (Offline AST by default) |
-| `SCOUT_API_KEY` | API Key for legacy chat LLM provider | - | Optional |
-| `SCOUT_MODEL` | Legacy LLM model name (e.g. `llama3.1:8b`, `gpt-4o-mini`) | - | Optional |
-| `SCOUT_LLM_TIMEOUT_MS` | Max wait time for legacy LLM requests | `30000` | No |
-| `SCOUT_LLM_PARALLELISM` | Number of concurrent requests sent to legacy LLM | `2` | No |
 | `SCOUT_PARSER` | Parser mode: `auto` (detects non-JS/TS files), `oxc`, or `tree-sitter` | `auto` | No |
 | `SCOUT_WORKSPACE_ROOT` | Override target workspace directory path | Auto-discovered | No |
 
@@ -452,8 +443,7 @@ node dist/index.js
 You can simulate an MCP JSON-RPC call directly from your terminal:
 ```bash
 echo '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"find_code","arguments":{"task":"database connection"}}}' \
-  | SCOUT_BASE_URL=http://localhost:11434/v1 SCOUT_API_KEY=ollama SCOUT_MODEL=llama3.1:8b \
-    node dist/index.js
+  | node dist/index.js
 ```
 
 ### Interactive MCP Inspector

@@ -15,7 +15,7 @@ const mockConfig: ScoutConfig = {
 describe('runFindCodePipeline with Custom Search', () => {
   test('successfully performs custom regex/word search on project files', async () => {
     const root = path.resolve(import.meta.dir, '../..')
-    const query = '"cleanJSON" in src/extraction/llm.ts'
+    const query = '"cleanJSON" in src/shared/utils/json.ts'
     
     const parsed = await runFindCodePipeline(query, mockConfig, false, root)
     
@@ -23,18 +23,18 @@ describe('runFindCodePipeline with Custom Search', () => {
     expect(parsed).toHaveProperty('structuredContent')
     expect(parsed.markdown).toContain('[Scout: FOUND]')
     expect(parsed.markdown).toContain('## Match@L')
-    expect(parsed.markdown).toContain('src/extraction/llm.ts')
+    expect(parsed.markdown).toContain('src/shared/utils/json.ts')
     expect(parsed.markdown).toContain('cleanJSON')
 
     const structured = parsed.structuredContent
-    expect(structured.symbols).toContain('src/extraction/llm.ts|Match@L')
+    expect(structured.symbols).toContain('src/shared/utils/json.ts|Match@L')
     expect(structured.confidence).toBe(1.0)
-    expect(structured.reason).toBe('Keyword/regex search matching "cleanJSON" in "src/extraction/llm.ts"')
+    expect(structured.reason).toBe('Keyword/regex search matching "cleanJSON" in "src/shared/utils/json.ts"')
   })
 
   test('returns empty results if no match is found for search query', async () => {
     const root = path.resolve(import.meta.dir, '../..')
-    const query = '"nonExistentWordInCodebaseBlaBla" in src/llm.ts'
+    const query = '"nonExistentWordInCodebaseBlaBla" in src/shared/utils/json.ts'
 
     const parsed = await runFindCodePipeline(query, mockConfig, false, root)
 

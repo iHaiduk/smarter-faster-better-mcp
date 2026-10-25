@@ -7,7 +7,7 @@ import { formatDegraded } from '../bundle/formatter/format.js'
 import { errorMessage } from '../shared/errors/errorMessage.js'
 
 const DESCRIPTION =
-  'Call find_code first; use get_file_context for exact ranges. Extracts precise code slices with automatically resolved imports and related type declarations from the project map.'
+  'Exact ranges only; call find_code first. Extracts precise code slices with automatically resolved imports and related type declarations from the project map.'
 
 const SCHEMA = {
   file: z.string().describe('Relative path to the target file'),

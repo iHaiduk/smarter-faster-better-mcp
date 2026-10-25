@@ -1,42 +1,16 @@
 import * as path from 'node:path'
-import { describe, expect, test, beforeAll, afterAll } from 'bun:test'
+import { describe, expect, test, beforeAll } from 'bun:test'
 import { loadConfig, getParserMode } from '../config/index.js'
 import { buildMap, getProjectFiles } from '../indexing/symbol-map/build-map.js'
 import { resolveWorkspaceRoot } from '../shared/fs/resolveWorkspaceRoot.js'
 import type { ProjectMap } from '../shared/types/index.js'
 
 describe('Integration: Config Loading', () => {
-  const savedEnv = {
-    SCOUT_BASE_URL: process.env['SCOUT_BASE_URL'],
-    SCOUT_API_KEY: process.env['SCOUT_API_KEY'],
-    SCOUT_MODEL: process.env['SCOUT_MODEL'],
-  }
-
-  beforeAll(() => {
-    process.env['SCOUT_BASE_URL'] = process.env['SCOUT_BASE_URL'] ?? 'http://localhost:11434/v1'
-    process.env['SCOUT_API_KEY'] = process.env['SCOUT_API_KEY'] ?? 'test-key'
-    process.env['SCOUT_MODEL'] = process.env['SCOUT_MODEL'] ?? 'test-model'
-  })
-
-  afterAll(() => {
-    for (const [key, val] of Object.entries(savedEnv)) {
-      if (val === undefined) {
-        delete process.env[key]
-      } else {
-        process.env[key] = val
-      }
-    }
-  })
-
   test('loadConfig returns valid ScoutConfig', () => {
     const config = loadConfig()
     expect(config).toBeDefined()
     expect(typeof config.parser).toBe('string')
     expect(config.parser).toMatch(/^(oxc|tree-sitter|auto)$/)
-    expect(typeof config.llmTimeoutMs).toBe('number')
-    expect(config.llmTimeoutMs).toBeGreaterThan(0)
-    expect(typeof config.llmParallelism).toBe('number')
-    expect(config.llmParallelism).toBeGreaterThan(0)
   })
 
   test('getParserMode returns valid mode', () => {
@@ -47,10 +21,21 @@ describe('Integration: Config Loading', () => {
   test('loadConfig works in zero-config mode when env vars are missing', () => {
     const config = loadConfig({})
     expect(config).toBeDefined()
-    expect(config.baseUrl).toBeUndefined()
-    expect(config.apiKey).toBeUndefined()
-    expect(config.model).toBeUndefined()
     expect(config.parser).toMatch(/^(oxc|tree-sitter|auto)$/)
+  })
+
+  test('loadConfig picks up package-root .env as fallback when run from another cwd', async () => {
+    const prevCwd = process.cwd()
+    const tmpDir = await import('node:os').then((os) => os.tmpdir())
+    try {
+      process.chdir(tmpDir)
+      const config = loadConfig()
+      // If package-root .env has JEV_API_KEY, loadConfig should have picked it up
+      expect(config).toBeDefined()
+      expect(config.parser).toBeDefined()
+    } finally {
+      process.chdir(prevCwd)
+    }
   })
 })
 

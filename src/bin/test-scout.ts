@@ -64,18 +64,7 @@ async function run(): Promise<void> {
     }
   }
 
-  console.log('\n[4/4] Running full LLM pipeline...')
-
-  const { SCOUT_BASE_URL: baseUrl, SCOUT_MODEL: model, SCOUT_API_KEY: apiKey } = process.env
-  if (!baseUrl || !model || !apiKey) {
-    console.log(`  ${paint('yellow', '⚠ SCOUT_* env variables are not fully set.')}`)
-    console.log('  For a full LLM test, set them in .env or run with:')
-    console.log('  SCOUT_BASE_URL=... SCOUT_API_KEY=... SCOUT_MODEL=... bun run src/bin/test-scout.ts')
-    console.log(`\n${paint('green', '=== Local AST test passed successfully! ===')}\n`)
-    return
-  }
-
-  console.log(`  Using LLM: ${paint('cyan', model)} on ${paint('cyan', baseUrl)}`)
+  console.log('\n[4/4] Running one-call scout pipeline...')
 
   try {
     const config = loadConfig()

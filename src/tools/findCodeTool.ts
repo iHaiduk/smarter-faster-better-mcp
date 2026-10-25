@@ -8,7 +8,7 @@ import { formatDegraded } from '../bundle/formatter/format.js'
 import { errorMessage } from '../shared/errors/errorMessage.js'
 
 const DESCRIPTION =
-  'Fast AST-based code search. Finds function/class declarations, types, interfaces, and call graphs without full-text grep noise. Best for code exploration and symbol discovery.'
+  'Use FIRST for any where-is / why / how question; returns only relevant symbols with file:Lx-Ly and relations'
 
 const SCHEMA = {
   task: z.string().describe('What you need to find or understand (e.g. symbol name, feature, or task description)'),

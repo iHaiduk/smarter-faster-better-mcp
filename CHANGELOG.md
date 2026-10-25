@@ -12,6 +12,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - **Removed `scout_*` Tool Aliases**:
   - Removed duplicate `scout_*` prefixes (`scout_find_code`, `scout_triage`, `scout_trace_symbol`, etc.) in favor of single canonical tool names (`find_code`, `triage`, `trace_symbol`, etc.).
   - Reduces registered tools in `tools/list` from 23 to 12, saving agent context tokens.
+- **Removed Local LLM Support**:
+  - Dropped legacy chat LLM configuration (`SCOUT_BASE_URL`, `SCOUT_MODEL`, `SCOUT_API_KEY`, `askCheapLLM`, `llmFetch`).
+  - TypeSafe JEV System-1 is the sole model integration, with offline deterministic AST matching as default.
+- **Large File Full-Read Suppression**:
+  - `get_file_context` now defaults to compact symbol outlines for files exceeding 150 lines unless `startLine`/`endLine`, `query`, or `full: true` is explicitly provided.
+
+### Added & Improved
+- **Package-Root `.env` Fallback**:
+  - `loadConfig()` now loads cwd `.env` first, then falls back to the package-root `.env` so MCP credentials work seamlessly when spawned from consumer repos.
+- **One-Call Scout Pipeline**:
+  - Unified `find_code` into a single high-recall request (broad candidates → JEV candidate filter → OxC extraction → 12k budget waterfall).
 
 ---
 
