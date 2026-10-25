@@ -140,6 +140,21 @@ interface FileRenderPayload {
   readonly outlineMessage?: string
 }
 
+export function renderSymbolOutline(
+  file: string,
+  symbols: readonly { name: string; signature?: string; line?: number; startLine?: number; endLine?: number }[],
+  note?: string,
+): string {
+  const sections: string[] = [`### Outline: ${file}`]
+  if (note) sections.push(note)
+  for (const s of symbols) {
+    const start = s.startLine ?? s.line
+    const loc = start ? (s.endLine && s.endLine !== start ? `:L${start}-${s.endLine}` : `:L${start}`) : ''
+    sections.push(`- ${s.signature || s.name} (${file}${loc})`)
+  }
+  return sections.join('\n')
+}
+
 function renderFilePayload(
   payload: FileRenderPayload,
   stage: 'full' | 'no-types' | 'folded',
@@ -152,12 +167,16 @@ function renderFilePayload(
   if (verdictLine) sections.push(verdictLine)
 
   if (payload.isOutline) {
-    sections.push(payload.outlineMessage ?? '// No symbol matched query identifiers')
-    for (const s of payload.symbols) {
-      const loc = s.startLine && s.endLine ? `:L${s.startLine}-${s.endLine}` : ''
-      sections.push(`- ${s.signature || s.candidate.symbol} (${payload.file}${loc})`)
-    }
-    return sections.join('\n')
+    return renderSymbolOutline(
+      payload.file,
+      payload.symbols.map((s) => ({
+        name: s.candidate.symbol,
+        signature: s.signature,
+        startLine: s.startLine,
+        endLine: s.endLine,
+      })),
+      payload.outlineMessage ?? '// No symbol matched query identifiers',
+    )
   }
 
   for (const sym of payload.symbols) {
@@ -468,32 +487,18 @@ export async function runTraceSymbolPipeline(
   )
 }
 
-/** Securely reads context of a specific file range with auto-expanded imports and related types. */
-export async function runGetFileContext(
+async function renderFileSlice(
   fileRelPath: string,
-  startLine?: number,
-  endLine?: number,
-  targetRoot = process.cwd(),
-  _query?: string,
+  lines: string[],
+  sLine: number,
+  eLine: number,
+  targetRoot: string,
+  map?: ProjectMap,
 ): Promise<ToolResultPayload> {
-  const map = await readMap(targetRoot).catch(() => undefined)
-  const resolved = await resolveSecurePath(fileRelPath, targetRoot)
-
-  if ('error' in resolved) {
-    return toStructuredJSON(resolved.error, [], 0, 'Access denied or file not found.', [], [], map)
-  }
-
-  const text = await fs.readFile(resolved.realPath, 'utf8')
-  const lines = text.split('\n')
-  const sLine = startLine ? Math.max(1, startLine) : 1
-  const eLine = endLine ? Math.min(lines.length, endLine) : lines.length
-
   const slicedContent = lines.slice(sLine - 1, eLine).join('\n')
-
   const sections: string[] = []
   const ext = fileRelPath.split('.').pop() || 'text'
 
-  // Include imports when the slice starts after them and they are short enough (max 30 lines).
   const importsEnd = sLine > 1 ? findImportsEnd(lines) : 0
   if (importsEnd > 0 && importsEnd < sLine && importsEnd <= 30) {
     const importsSection = lines.slice(0, importsEnd).join('\n')
@@ -509,26 +514,108 @@ export async function runGetFileContext(
   sections.push(slicedContent)
   sections.push('```')
 
-  // Include related types referenced in the code (max 2, max 10 lines each).
-  if (!map) {
-    const markdown = sections.join('\n')
-    return toStructuredJSON(markdown, [makeFileContextExtracted(fileRelPath, slicedContent, sLine, eLine, map)], 1.0, 'Direct file context provided.', [], [], map)
-  }
-
-  const relatedTypes = findRelatedTypesInCode(slicedContent, map, fileRelPath)
-  for (const typeSym of relatedTypes.slice(0, 2)) {
-    const typeSlice = await readTypeSlice(targetRoot, typeSym)
-    if (typeSlice) {
-      sections.push('')
-      sections.push(`#### ${typeSym.name} (${typeSym.file}:${typeSym.line})`)
-      sections.push(`\`\`\`${ext}`)
-      sections.push(typeSlice)
-      sections.push('```')
+  if (map) {
+    const relatedTypes = findRelatedTypesInCode(slicedContent, map, fileRelPath)
+    for (const typeSym of relatedTypes.slice(0, 2)) {
+      const typeSlice = await readTypeSlice(targetRoot, typeSym)
+      if (typeSlice) {
+        sections.push('')
+        sections.push(`#### ${typeSym.name} (${typeSym.file}:${typeSym.line})`)
+        sections.push(`\`\`\`${ext}`)
+        sections.push(typeSlice)
+        sections.push('```')
+      }
     }
   }
 
   const markdown = sections.join('\n')
-  return toStructuredJSON(markdown, [makeFileContextExtracted(fileRelPath, slicedContent, sLine, eLine, map)], 1.0, 'Direct file context provided with imports and related types.', [], [], map)
+  return toStructuredJSON(
+    markdown,
+    [makeFileContextExtracted(fileRelPath, slicedContent, sLine, eLine, map)],
+    1.0,
+    'Direct file context provided with imports and related types.',
+    [],
+    [],
+    map,
+  )
+}
+
+/** Securely reads context of a specific file range with auto-expanded imports and related types. */
+export async function runGetFileContext(
+  fileRelPath: string,
+  startLine?: number,
+  endLine?: number,
+  targetRoot = process.cwd(),
+  query?: string,
+  full = false,
+): Promise<ToolResultPayload> {
+  const map = await readMap(targetRoot).catch(() => undefined)
+  const resolved = await resolveSecurePath(fileRelPath, targetRoot)
+
+  if ('error' in resolved) {
+    return toStructuredJSON(resolved.error, [], 0, 'Access denied or file not found.', [], [], map)
+  }
+
+  const text = await fs.readFile(resolved.realPath, 'utf8')
+  const lines = text.split('\n')
+  const totalLines = lines.length
+
+  // Branch 1: Explicit line range or full: true escape hatch
+  if (startLine !== undefined || endLine !== undefined || full) {
+    const sLine = startLine ? Math.max(1, startLine) : 1
+    const eLine = endLine ? Math.min(totalLines, endLine) : totalLines
+    return renderFileSlice(fileRelPath, lines, sLine, eLine, targetRoot, map)
+  }
+
+  // Branch 2: Query provided - return matching symbol bodies + fold others
+  if (query && query.trim().length > 0 && map) {
+    const fileSymbols = map.symbols.filter((s) => s.file === fileRelPath)
+    const queryTerms = extractTaskTerms(query)
+    const matchingSymbols = matchSymbolsInFile(fileSymbols, query, queryTerms)
+    const matchingNames = new Set(matchingSymbols.map((m) => m.name))
+
+    const sections: string[] = [`### File Context: ${fileRelPath} (query-filtered for: "${query}")`]
+    const extractedList: ExtractedSymbol[] = []
+
+    for (const sym of fileSymbols) {
+      if (matchingNames.has(sym.name)) {
+        const candidate: LLMCandidate = { file: fileRelPath, symbol: sym.name, confidence: 1.0 }
+        const extracted = await extractWithOxc(candidate, map, false, targetRoot)
+        extractedList.push(extracted)
+        const loc = extracted.startLine && extracted.endLine ? `:L${extracted.startLine}-${extracted.endLine}` : ''
+        sections.push(`#### ${sym.name} (${fileRelPath}${loc})`)
+        sections.push('```ts')
+        sections.push(extracted.code || extracted.signature)
+        sections.push('```')
+      } else {
+        const loc = sym.line ? `:L${sym.line}` : ''
+        sections.push(`- [folded] ${sym.signature || sym.name} (${fileRelPath}${loc})`)
+      }
+    }
+
+    if (extractedList.length === 0) {
+      const outline = renderSymbolOutline(
+        fileRelPath,
+        fileSymbols,
+        `// No symbol in this file matched query "${query}". Pass startLine/endLine or full: true to read.`,
+      )
+      return toStructuredJSON(outline, [], 0.5, 'No matching symbol in file.', [], [], map)
+    }
+
+    const markdown = sections.join('\n')
+    return toStructuredJSON(markdown, extractedList, 1.0, `Filtered symbols in ${fileRelPath} matching "${query}".`, [], [], map)
+  }
+
+  // Branch 3: No range, no query, file > 150 lines -> outline
+  if (totalLines > 150) {
+    const fileSymbols = map?.symbols.filter((s) => s.file === fileRelPath) ?? []
+    const outlineNote = `// File exceeds 150 lines (${totalLines} lines). Pass startLine/endLine, query, or full: true to inspect implementation.`
+    const markdown = renderSymbolOutline(fileRelPath, fileSymbols, outlineNote)
+    return toStructuredJSON(markdown, [], 1.0, `Outline of ${fileRelPath} (${totalLines} lines).`, [], [], map)
+  }
+
+  // Branch 4: File <= 150 lines -> full file
+  return renderFileSlice(fileRelPath, lines, 1, totalLines, targetRoot, map)
 }
 
 /**
