@@ -32,6 +32,7 @@ export function getTypeSafeClient(config?: ScoutConfig): TypeSafeClient | null {
     baseURL: customBaseUrl || undefined,
     fetch: async (url, init) => {
       const res = await fetch(url, init)
+      if (res.status === 204 || res.status === 304) return res
       const text = await res.text()
       const wrapped = new Response(text, {
         status: res.status,

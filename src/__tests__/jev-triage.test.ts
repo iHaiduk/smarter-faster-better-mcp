@@ -89,4 +89,27 @@ describe('Dynamic Triage & AST Skeletons', () => {
     const available = isJevAvailable()
     expect(typeof available).toBe('boolean')
   })
+
+  it('getTypeSafeClient custom fetch handles 204/304 status and buffers bodies without stream lock', async () => {
+    const { getTypeSafeClient } = await import('../extraction/jev/client.js')
+    const client = getTypeSafeClient({ jevApiKey: 'test-key' })
+    expect(client).not.toBeNull()
+
+    // Test custom fetch on 204
+    const originalFetch = globalThis.fetch
+    try {
+      globalThis.fetch = async () => new Response(null, { status: 204 })
+      const res204 = await (client as unknown as { fetch: (url: string, init?: RequestInit) => Promise<Response> }).fetch('http://test')
+      expect(res204.status).toBe(204)
+
+      // Test custom fetch buffering on 200 JSON
+      globalThis.fetch = async () => new Response(JSON.stringify({ ok: true }), { status: 200, headers: { 'content-type': 'application/json' } })
+      const res200 = await (client as unknown as { fetch: (url: string, init?: RequestInit) => Promise<Response> }).fetch('http://test')
+      expect(res200.status).toBe(200)
+      const text = await res200.text()
+      expect(text).toContain('"ok":true')
+    } finally {
+      globalThis.fetch = originalFetch
+    }
+  })
 })
