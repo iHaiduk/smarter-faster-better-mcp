@@ -42,6 +42,7 @@
     "scout": "bun run src/bin/test-scout.ts cache",
     "scout:summary": "bun run src/bin/test-scout.ts cache --summary",
     "test": "bun test",
+    "measure:golden": "bun run scripts/measure-golden.ts",
     "verify:pack": "node ./scripts/verify-packed-entry.mjs"
   },
   "dependencies": {
@@ -60,7 +61,7 @@
     "@types/bun": "1.4.3",
     "@types/node": "26.6.5",
     "eslint": "10.13.0",
-    "typescript": "7.0.2",
+    "typescript": "5.8.2",
     "typescript-eslint": "8.71.2"
   }
 }
