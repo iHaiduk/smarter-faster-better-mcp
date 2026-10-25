@@ -28,5 +28,4 @@ export function registerExplainContextPackTool(server: McpServer, config: ScoutC
   }
 
   server.tool('explain_context_pack', DESCRIPTION, SCHEMA, handler)
-  server.tool('scout_explain_context_pack', DESCRIPTION, SCHEMA, handler)
 }

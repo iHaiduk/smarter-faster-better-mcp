@@ -40,5 +40,4 @@ export function registerFindCodeTool(server: McpServer, config: ScoutConfig): vo
   }
 
   server.tool('find_code', DESCRIPTION, SCHEMA, handler)
-  server.tool('scout_find_code', DESCRIPTION, SCHEMA, handler)
 }

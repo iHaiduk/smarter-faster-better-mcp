@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
+## [0.11.0] - Unreleased
+
+### Breaking Changes
+- **Removed `scout_*` Tool Aliases**:
+  - Removed duplicate `scout_*` prefixes (`scout_find_code`, `scout_triage`, `scout_trace_symbol`, etc.) in favor of single canonical tool names (`find_code`, `triage`, `trace_symbol`, etc.).
+  - Reduces registered tools in `tools/list` from 23 to 12, saving agent context tokens.
+
+---
+
 ## [0.10.2] - 2026-10-19
 
 ### Fixed & Improved

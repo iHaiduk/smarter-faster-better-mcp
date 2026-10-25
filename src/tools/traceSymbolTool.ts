@@ -28,5 +28,4 @@ export function registerTraceSymbolTool(server: McpServer): void {
   }
 
   server.tool('trace_symbol', DESCRIPTION, SCHEMA, handler)
-  server.tool('scout_trace_symbol', DESCRIPTION, SCHEMA, handler)
 }

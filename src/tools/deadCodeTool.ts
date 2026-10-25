@@ -47,5 +47,4 @@ export function registerDeadCodeTool(server: McpServer): void {
   }
 
   server.tool('dead_code', DESCRIPTION, SCHEMA, handler)
-  server.tool('scout_dead_code', DESCRIPTION, SCHEMA, handler)
 }

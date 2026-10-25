@@ -158,14 +158,12 @@ describe('Integration: MCP Tool Registration & Serialization', () => {
     await client.connect(clientTransport)
 
     const list = await client.listTools()
-    expect(list.tools.length).toBeGreaterThanOrEqual(23)
+    expect(list.tools.length).toBe(12)
 
     const triageTool = list.tools.find((t) => t.name === 'triage')
-    const scoutTriageTool = list.tools.find((t) => t.name === 'scout_triage')
     expect(triageTool).toBeDefined()
-    expect(scoutTriageTool).toBeDefined()
-    expect(scoutTriageTool?.inputSchema).toBeDefined()
-    expect(scoutTriageTool?.inputSchema.properties?.['criteria']).toBeDefined()
+    expect(triageTool?.inputSchema).toBeDefined()
+    expect(triageTool?.inputSchema.properties?.['criteria']).toBeDefined()
 
     await client.close()
     await server.close()

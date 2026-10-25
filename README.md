@@ -83,7 +83,7 @@ graph TD
         MCPClient --> Tools
 
         subgraph Tools ["Exposed MCP Tools Boundaries (src/tools/)"]
-            Triage["scout_triage (Dynamic AI Criteria)"]
+            Triage["triage (Dynamic AI Criteria)"]
             FindCode["find_code"]
             TraceSymbol["trace_symbol"]
             GetContext["get_file_context"]
@@ -103,7 +103,7 @@ graph TD
         WriteMap --> Dispatcher["Execution Dispatcher"]
         Indexer -- Yes --> Dispatcher
 
-        Dispatcher -- scout_triage --> JevEngine["TypeSafe Jev (System 1 Engine)"]
+        Dispatcher -- triage --> JevEngine["TypeSafe Jev (System 1 Engine)"]
         subgraph JevPipeline ["Dynamic System-1 Triage (<500ms)"]
             JevEngine --> ASTSkeletons["Generate AST File Skeletons (Exports, Imports, Sigs)"]
             ASTSkeletons --> SinglePass["Batch Evaluate AI Criteria (check, classify, score)"]
@@ -200,7 +200,7 @@ Add `.env` to your `.gitignore` to keep API keys secure and private.
 
 | Variable | Description | Default | Recommended / Purpose |
 | :--- | :--- | :--- | :--- |
-| `JEV_API_KEY` (or `TYPESAFE_API_KEY`) | API Key for TypeSafe Jev (System 1 model) | - | **Recommended** for sub-second code & hypothesis triage (`scout_triage`) |
+| `JEV_API_KEY` (or `TYPESAFE_API_KEY`) | API Key for TypeSafe Jev (System 1 model) | - | **Recommended** for sub-second code & hypothesis triage (`triage`) |
 | `JEV_BASE_URL` | Custom endpoint for TypeSafe Jev API | `https://api.typesafe.ai` | No (default is official API) |
 | `SCOUT_BASE_URL` | Endpoint of legacy chat LLM provider (Ollama, OpenAI, LM Studio) | - | Optional (Offline AST by default) |
 | `SCOUT_API_KEY` | API Key for legacy chat LLM provider | - | Optional |
@@ -306,11 +306,11 @@ Forces a complete rebuild of the project AST symbol map and import graph. Use wh
 Analyzes the blast radius of changing a code symbol. Shows all files, modules, and execution flows that would be affected by modifying the target symbol. Use before refactoring, renaming, or deleting shared code.
 - **Parameters**: `symbolName`, `file`, `workspaceRoot`
 
-### `dead_code` (or `scout_dead_code`)
+### `dead_code`
 Detects dead / unused code in the project. Identifies unreachable orphan files, dead exports never imported elsewhere, and dead islands using full BFS graph reachability from project entrypoints.
 - **Parameters**: `entrypoints`, `includeExports`, `minConfidence`, `workspaceRoot`
 
-### `subsystem_clusters` (or `scout_cluster_subsystems`)
+### `subsystem_clusters`
 Performs Louvain community detection on the project dependency graph to discover architectural subsystems, modules, and domain boundaries with cohesion and coupling metrics.
 - **Parameters**: `resolution`, `minClusterSize`, `workspaceRoot`
 
@@ -318,7 +318,7 @@ Performs Louvain community detection on the project dependency graph to discover
 *Live LSP & Compiler Diagnostics Bridge.* Retrieves real-time semantic diagnostics (type errors, syntax errors, missing/unresolved imports) powered by TypeScript Language Service in the background.
 - **Parameters**: `file` (optional relative/absolute path), `severity` (`'error' | 'warning' | 'all'`), `limit`, `targetRoot`
 
-### `scout_triage`
+### `triage`
 *Universal AI-to-Code Dynamic Triage Engine.* Powered by **TypeSafe Jev (System 1)**. Allows ANY external AI model (Claude, GPT, Gemini, GLM) to evaluate arbitrary, domain-specific criteria against AST candidate files in a single fast pass (<500ms) without hardcoded taxonomies or schemas.
 
 **When to use:**

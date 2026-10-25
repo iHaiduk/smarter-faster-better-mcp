@@ -28,5 +28,4 @@ export function registerBlastRadiusTool(server: McpServer): void {
   }
 
   server.tool('blast_radius', DESCRIPTION, SCHEMA, handler)
-  server.tool('scout_blast_radius', DESCRIPTION, SCHEMA, handler)
 }

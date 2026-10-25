@@ -27,5 +27,4 @@ export function registerFindFilesTool(server: McpServer): void {
   }
 
   server.tool('find_files', DESCRIPTION, SCHEMA, handler)
-  server.tool('scout_find_files', DESCRIPTION, SCHEMA, handler)
 }

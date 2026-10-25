@@ -62,5 +62,4 @@ export function registerCleanupTool(server: McpServer): void {
   }
 
   server.tool('cleanup_workspace', DESCRIPTION, SCHEMA, handler)
-  server.tool('scout_cleanup_workspace', DESCRIPTION, SCHEMA, handler)
 }

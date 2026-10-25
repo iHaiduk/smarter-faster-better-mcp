@@ -80,7 +80,7 @@ export function registerDynamicTriageTool(server: McpServer, config: ScoutConfig
           {
             type: 'text' as const,
             text: JSON.stringify({
-              error: `scout_triage failed: ${errorMsg}`,
+              error: `triage failed: ${errorMsg}`,
               intent: args.intent,
               matches: [],
             }),
@@ -91,5 +91,4 @@ export function registerDynamicTriageTool(server: McpServer, config: ScoutConfig
   }
 
   server.tool('triage', DESCRIPTION, SCHEMA, handler)
-  server.tool('scout_triage', DESCRIPTION, SCHEMA, handler)
 }

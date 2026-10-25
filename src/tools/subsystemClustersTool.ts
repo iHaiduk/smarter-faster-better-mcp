@@ -42,5 +42,4 @@ export function registerSubsystemClustersTool(server: McpServer): void {
   }
 
   server.tool('subsystem_clusters', DESCRIPTION, SCHEMA, handler)
-  server.tool('scout_cluster_subsystems', DESCRIPTION, SCHEMA, handler)
 }

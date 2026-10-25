@@ -45,5 +45,4 @@ export function registerRefreshMapTool(server: McpServer): void {
   }
 
   server.tool('refresh_map', DESCRIPTION, SCHEMA, handler)
-  server.tool('scout_refresh_map', DESCRIPTION, SCHEMA, handler)
 }

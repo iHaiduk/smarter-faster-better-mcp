@@ -30,5 +30,4 @@ export function registerGetFileContextTool(server: McpServer): void {
   }
 
   server.tool('get_file_context', DESCRIPTION, SCHEMA, handler)
-  server.tool('scout_get_file_context', DESCRIPTION, SCHEMA, handler)
 }
