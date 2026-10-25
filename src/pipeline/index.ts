@@ -32,6 +32,7 @@ import type {
   ScoutConfig,
   ContextBudgetOptions,
   RelevanceTier,
+  ToolResultPayload,
 } from '../shared/types/index.js'
 
 const MAX_CHUNKS = 5
@@ -44,7 +45,7 @@ export async function runFindCodePipeline(
   summaryOnly = false,
   targetRoot = process.cwd(),
   budget: ContextBudgetOptions = {},
-): Promise<string> {
+): Promise<ToolResultPayload> {
   const customQuery = parseCustomQuery(task)
   if (customQuery) {
     return runCustomSearch(customQuery, targetRoot, budget)
@@ -268,7 +269,7 @@ export async function runTraceSymbolPipeline(
   symbolName: string,
   file?: string,
   targetRoot = process.cwd(),
-): Promise<string> {
+): Promise<ToolResultPayload> {
   const map = await readMap(targetRoot)
 
   const resolvedFile = file ?? map.symbols.find((s) => s.name === symbolName)?.file
@@ -323,7 +324,7 @@ export async function runGetFileContext(
   endLine?: number,
   targetRoot = process.cwd(),
   _query?: string,
-): Promise<string> {
+): Promise<ToolResultPayload> {
   const map = await readMap(targetRoot).catch(() => undefined)
   const resolved = await resolveSecurePath(fileRelPath, targetRoot)
 
@@ -449,7 +450,7 @@ async function tryFilesystemFallback(
   analysis: QueryAnalysis | null | undefined,
   targetRoot: string,
   budget: FallbackBudget,
-): Promise<string | null> {
+): Promise<ToolResultPayload | null> {
   const exactIdentifiers = extractCodeIdentifiers(task)
   const analysisSymbols = analysis?.symbolNames ?? []
   const allSymbolNames = [...new Set([...exactIdentifiers, ...analysisSymbols])]
@@ -517,6 +518,6 @@ export async function runExplainContextPack(
   task: string,
   config: ScoutConfig,
   targetRoot = process.cwd(),
-): Promise<string> {
+): Promise<ToolResultPayload> {
   return runFindCodePipeline(task, config, true, targetRoot, { maxFiles: 10, maxSymbols: 20 })
 }

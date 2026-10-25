@@ -30,14 +30,20 @@ export function registerSubsystemClustersTool(server: McpServer): void {
   const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
-      const text = await runSubsystemClustersPipeline(root, {
+      const res = await runSubsystemClustersPipeline(root, {
         resolution: args.resolution,
         minClusterSize: args.minClusterSize,
       })
-      return { content: [{ type: 'text' as const, text }] }
+      return {
+        content: [{ type: 'text' as const, text: res.markdown }],
+        structuredContent: res.structuredContent as unknown as Record<string, unknown>,
+      }
     } catch (err) {
       const errorMsg = errorMessage(err)
-      return { content: [{ type: 'text' as const, text: formatDegraded(`subsystem_clusters failed: ${errorMsg}`) }] }
+      return {
+        content: [{ type: 'text' as const, text: formatDegraded(`subsystem_clusters failed: ${errorMsg}`) }],
+        isError: true,
+      }
     }
   }
 

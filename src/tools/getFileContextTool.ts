@@ -21,11 +21,17 @@ export function registerGetFileContextTool(server: McpServer): void {
   const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
-      const text = await runGetFileContext(args.file, args.startLine, args.endLine, root, args.query)
-      return { content: [{ type: 'text' as const, text }] }
+      const res = await runGetFileContext(args.file, args.startLine, args.endLine, root, args.query)
+      return {
+        content: [{ type: 'text' as const, text: res.markdown }],
+        structuredContent: res.structuredContent as unknown as Record<string, unknown>,
+      }
     } catch (err) {
       const errorMsg = errorMessage(err)
-      return { content: [{ type: 'text' as const, text: formatDegraded(`get_file_context failed: ${errorMsg}`) }] }
+      return {
+        content: [{ type: 'text' as const, text: formatDegraded(`get_file_context failed: ${errorMsg}`) }],
+        isError: true,
+      }
     }
   }
 

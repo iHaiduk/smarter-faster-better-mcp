@@ -4,6 +4,7 @@ import type {
   SymbolEntry,
   SymbolKind,
   ProjectMap,
+  ToolResultPayload,
 } from '../../shared/types/index.js'
 
 const MAX_SIG_CHARS = 80
@@ -167,7 +168,7 @@ function buildDepsString(extractions: readonly ExtractedSymbol[], map: ProjectMa
     .join(',')
 }
 
-/** Wraps a Markdown output and structured extractions into a unified JSON string payload. */
+/** Wraps Markdown output and structured extractions into a tool result payload with plain text. */
 export function toStructuredJSON(
   markdown: string,
   extractions: readonly ExtractedSymbol[],
@@ -178,7 +179,7 @@ export function toStructuredJSON(
   map?: ProjectMap,
   worktreeStatus?: string,
   staleIndexWarning?: boolean,
-): string {
+): ToolResultPayload {
   const cleanReason = reason.includes('preflight') ? 'deterministic' : reason.includes('LLM') ? 'llm' : reason
   const depsString = buildDepsString(extractions, map)
 
@@ -198,5 +199,5 @@ export function toStructuredJSON(
     staleIndexWarning,
   }
 
-  return JSON.stringify({ markdown, structuredContent: structured })
+  return { markdown, structuredContent: structured }
 }

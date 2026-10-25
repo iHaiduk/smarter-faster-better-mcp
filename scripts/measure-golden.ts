@@ -87,10 +87,13 @@ export async function runMeasurements(targetRoot = path.resolve(import.meta.dir,
     const start = performance.now()
     const output = await runFindCodePipeline(item.question, config, false, targetRoot)
     const latencyMs = Math.round(performance.now() - start)
-    const chars = output.length
+    const text = output.markdown
+    const chars = text.length
 
     // Check hit: either structured output or text contains expected symbol
-    const hit = output.includes(item.expectedSymbol) && output.includes(item.expectedFile)
+    const hit =
+      (text.includes(item.expectedSymbol) && text.includes(item.expectedFile)) ||
+      output.structuredContent.symbols.includes(item.expectedSymbol)
 
     results.push({
       question: item.question,

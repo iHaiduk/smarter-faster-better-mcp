@@ -3,7 +3,7 @@ import { findDepsStructured } from '../dependency-resolver/deps.js'
 import { toStructuredJSON } from '../bundle/formatter/format.js'
 import { getGitStatusMap } from '../shared/utils/git.js'
 
-import type { ExtractedSymbol } from '../shared/types/index.js'
+import type { ExtractedSymbol, ToolResultPayload } from '../shared/types/index.js'
 
 const MAX_BLAST_RADIUS_DEPTH = 3
 const MAX_BLAST_RADIUS_FILES = 50
@@ -29,7 +29,7 @@ export async function runBlastRadiusPipeline(
   symbolName: string,
   sourceFile: string,
   targetRoot = process.cwd(),
-): Promise<string> {
+): Promise<ToolResultPayload> {
   const map = await readMap(targetRoot)
 
   // Find the symbol in the map

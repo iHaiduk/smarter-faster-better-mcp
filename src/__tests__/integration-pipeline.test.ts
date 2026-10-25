@@ -44,18 +44,18 @@ describe('Integration: resolveSecurePath', () => {
 describe('Integration: runFindFiles', () => {
   test('finds files by glob pattern', async () => {
     const result = await runFindFiles('*.json', ROOT)
-    expect(result).toContain('package.json')
-    expect(result).toContain('Found')
+    expect(result.markdown).toContain('package.json')
+    expect(result.markdown).toContain('Found')
   })
 
   test('finds TypeScript files', async () => {
     const result = await runFindFiles('src/**/*.ts', ROOT)
-    expect(result).toContain('index.ts')
+    expect(result.markdown).toContain('index.ts')
   })
 
   test('returns empty for non-matching pattern', async () => {
     const result = await runFindFiles('*.nonexistent-ext', ROOT)
-    expect(result).toContain('Found 0 files')
+    expect(result.markdown).toContain('Found 0 files')
   })
 })
 
@@ -69,23 +69,23 @@ describe('Integration: runGetFileContext', () => {
       relevantContent: 'export function cleanJSON',
     }))
     const result = await runGetFileContext('src/shared/utils/json.ts')
-    expect(result).toContain('cleanJSON')
+    expect(result.markdown).toContain('cleanJSON')
   })
 
   test('falls back to raw content when LLM fails', async () => {
     mockFetchFail(500)
     const result = await runGetFileContext('src/shared/utils/json.ts')
-    expect(result).toContain('cleanJSON')
+    expect(result.markdown).toContain('cleanJSON')
   })
 
   test('rejects path traversal', async () => {
     const result = await runGetFileContext('../../etc/passwd')
-    expect(result).toContain('Access denied')
+    expect(result.markdown).toContain('Access denied')
   })
 
   test('handles nonexistent file', async () => {
     const result = await runGetFileContext('nonexistent.ts')
-    expect(result).toContain('File not found')
+    expect(result.markdown).toContain('File not found')
   })
 })
 
@@ -95,14 +95,14 @@ describe('Integration: runTraceSymbolPipeline', () => {
   test('traces an existing symbol', async () => {
     mockFetchLlm(JSON.stringify([]))
     const result = await runTraceSymbolPipeline('cleanJSON', 'src/shared/utils/json.ts')
-    expect(typeof result).toBe('string')
-    expect(result.length).toBeGreaterThan(0)
+    expect(typeof result.markdown).toBe('string')
+    expect(result.markdown.length).toBeGreaterThan(0)
   })
 
   test('handles unknown symbol gracefully', async () => {
     mockFetchLlm(JSON.stringify([]))
     const result = await runTraceSymbolPipeline('nonexistentSymbolXYZ')
-    expect(typeof result).toBe('string')
+    expect(typeof result.markdown).toBe('string')
   })
 })
 
@@ -122,8 +122,8 @@ describe('Integration: runFindCodePipeline', () => {
       parser: 'oxc',
     }
     const result = await runFindCodePipeline('cleanJSON function', config, false, ROOT)
-    expect(typeof result).toBe('string')
-    expect(result.length).toBeGreaterThan(0)
+    expect(typeof result.markdown).toBe('string')
+    expect(result.markdown.length).toBeGreaterThan(0)
   })
 })
 
@@ -143,8 +143,8 @@ describe('Integration: runExplainContextPack', () => {
       parser: 'oxc',
     }
     const result = await runExplainContextPack('refactor the JSON cleaning utility', config, ROOT)
-    expect(typeof result).toBe('string')
-    expect(result.length).toBeGreaterThan(0)
+    expect(typeof result.markdown).toBe('string')
+    expect(result.markdown.length).toBeGreaterThan(0)
   })
 })
 
@@ -179,8 +179,7 @@ describe('Integration: Full pipeline with query analysis + validation', () => {
   test('deterministic exact match skips LLM and validation', async () => {
     // query: 'cleanJSON' — this is an exact symbol name in the project map.
     // Pipeline should match deterministically, skip LLM, skip validation.
-    const result = await runFindCodePipeline('cleanJSON', config, false, ROOT)
-    const parsed = JSON.parse(result)
+    const parsed = await runFindCodePipeline('cleanJSON', config, false, ROOT)
     expect(parsed.markdown).toContain('cleanJSON')
     expect(parsed.structuredContent.symbols).toContain('cleanJSON')
     // No fetch calls should have been made (deterministic match, no validation)
@@ -204,8 +203,7 @@ describe('Integration: Full pipeline with query analysis + validation', () => {
       }), { status: 200 }) as unknown as Response
     }) as unknown as typeof fetch
 
-    const result = await runFindCodePipeline('cleanJSON function', config, false, ROOT)
-    const parsed = JSON.parse(result)
+    const parsed = await runFindCodePipeline('cleanJSON function', config, false, ROOT)
     // Should still find cleanJSON despite analysis failure
     expect(parsed.structuredContent.symbols).toContain('cleanJSON')
   })
@@ -233,8 +231,7 @@ describe('Integration: Full pipeline with query analysis + validation', () => {
       }),
     )
 
-    const result = await runFindCodePipeline('JSON cleaning utility', config, false, ROOT)
-    const parsed = JSON.parse(result)
+    const parsed = await runFindCodePipeline('JSON cleaning utility', config, false, ROOT)
     expect(parsed.structuredContent.symbols).toContain('cleanJSON')
     // At least analysis + LLM + validation calls
     expect(callCount).toBeGreaterThanOrEqual(3)
@@ -263,8 +260,7 @@ describe('Integration: Full pipeline with query analysis + validation', () => {
       }),
     )
 
-    const result = await runFindCodePipeline('text formatting utility', config, false, ROOT)
-    const parsed = JSON.parse(result)
+    const parsed = await runFindCodePipeline('text formatting utility', config, false, ROOT)
     // cleanJSON should be filtered out or fallback to keeping it
     // Either way, the pipeline doesn't crash
     expect(typeof parsed.markdown).toBe('string')
@@ -283,6 +279,6 @@ describe('Integration: Full pipeline with query analysis + validation', () => {
     )
 
     const result = await runFindCodePipeline('quantum computing implementation', config, false, ROOT)
-    expect(result).toContain('NOT_FOUND')
+    expect(result.markdown).toContain('NOT_FOUND')
   })
 })

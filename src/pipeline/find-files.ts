@@ -3,12 +3,12 @@ import { getProjectFiles } from '../indexing/symbol-map/build-map.js'
 import { matchGlob, normalizePath } from '../shared/utils/glob.js'
 import { toStructuredJSON } from '../bundle/formatter/format.js'
 
-import type { ExtractedSymbol } from '../shared/types/index.js'
+import type { ExtractedSymbol, ToolResultPayload } from '../shared/types/index.js'
 
 const FILE_MATCH_SYMBOL = 'FILE_MATCH'
 
 /** Searches files by pattern inside the workspace. */
-export async function runFindFiles(pattern: string, targetRoot = process.cwd()): Promise<string> {
+export async function runFindFiles(pattern: string, targetRoot = process.cwd()): Promise<ToolResultPayload> {
   const files = await getProjectFiles(targetRoot, getParserMode())
   const normalizedPattern = normalizePath(pattern)
   const isGlob = normalizedPattern.includes('*') || normalizedPattern.includes('?')

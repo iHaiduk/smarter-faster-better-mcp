@@ -19,11 +19,17 @@ export function registerBlastRadiusTool(server: McpServer): void {
   const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
-      const text = await runBlastRadiusPipeline(args.symbolName, args.file, root)
-      return { content: [{ type: 'text' as const, text }] }
+      const res = await runBlastRadiusPipeline(args.symbolName, args.file, root)
+      return {
+        content: [{ type: 'text' as const, text: res.markdown }],
+        structuredContent: res.structuredContent as unknown as Record<string, unknown>,
+      }
     } catch (err) {
       const errorMsg = errorMessage(err)
-      return { content: [{ type: 'text' as const, text: formatDegraded(`blast_radius failed: ${errorMsg}`) }] }
+      return {
+        content: [{ type: 'text' as const, text: formatDegraded(`blast_radius failed: ${errorMsg}`) }],
+        isError: true,
+      }
     }
   }
 

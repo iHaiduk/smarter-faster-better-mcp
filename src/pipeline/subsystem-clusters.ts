@@ -1,7 +1,7 @@
 import { readMap } from '../cache/map-cache.js'
 import { analyzeSubsystems, type LouvainOptions } from '../analysis/louvain.js'
 import { toStructuredJSON } from '../bundle/formatter/format.js'
-import type { ExtractedSymbol } from '../shared/types/index.js'
+import type { ExtractedSymbol, ToolResultPayload } from '../shared/types/index.js'
 
 export interface SubsystemPipelineOptions extends LouvainOptions {
   readonly minClusterSize?: number
@@ -13,7 +13,7 @@ export interface SubsystemPipelineOptions extends LouvainOptions {
 export async function runSubsystemClustersPipeline(
   targetRoot = process.cwd(),
   options: SubsystemPipelineOptions = {},
-): Promise<string> {
+): Promise<ToolResultPayload> {
   const map = await readMap(targetRoot)
   const metrics = analyzeSubsystems(map, options)
   const minClusterSize = options.minClusterSize ?? 1

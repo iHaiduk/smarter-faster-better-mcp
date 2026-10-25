@@ -81,13 +81,13 @@ async function run(): Promise<void> {
     const config = loadConfig()
     const result = await runFindCodePipeline(query, config, summaryOnly)
 
-    if (result.includes('[Scout: DEGRADED]') && localFiltered.length > 0) {
+    if (result.markdown.includes('[Scout: DEGRADED]') && localFiltered.length > 0) {
       await runMockPipeline(map, localFiltered, summaryOnly)
       return
     }
 
     console.log(`\n${paint('magenta', '=== PIPELINE RESULT ===')}`)
-    console.log(result)
+    console.log(result.markdown)
     console.log(paint('magenta', '===================================='))
     console.log()
   } catch (err) {

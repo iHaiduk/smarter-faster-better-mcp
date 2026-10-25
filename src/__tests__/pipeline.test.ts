@@ -17,8 +17,7 @@ describe('runFindCodePipeline with Custom Search', () => {
     const root = path.resolve(import.meta.dir, '../..')
     const query = '"cleanJSON" in src/extraction/llm.ts'
     
-    const result = await runFindCodePipeline(query, mockConfig, false, root)
-    const parsed = JSON.parse(result)
+    const parsed = await runFindCodePipeline(query, mockConfig, false, root)
     
     expect(parsed).toHaveProperty('markdown')
     expect(parsed).toHaveProperty('structuredContent')
@@ -37,8 +36,7 @@ describe('runFindCodePipeline with Custom Search', () => {
     const root = path.resolve(import.meta.dir, '../..')
     const query = '"nonExistentWordInCodebaseBlaBla" in src/llm.ts'
 
-    const result = await runFindCodePipeline(query, mockConfig, false, root)
-    const parsed = JSON.parse(result)
+    const parsed = await runFindCodePipeline(query, mockConfig, false, root)
 
     expect(parsed.markdown).toContain('[Scout: FOUND]') // formatFound with empty list
     expect(parsed.structuredContent.symbols).toBe('file|symbol|lines|tier|status')
@@ -61,8 +59,7 @@ describe('runFindCodePipeline with Custom Search', () => {
 
   test('produces unique symbol names per match block', async () => {
     const root = path.resolve(import.meta.dir, '../..')
-    const result = await runFindCodePipeline('"function" in src/llm.ts', mockConfig, false, root)
-    const parsed = JSON.parse(result)
+    const parsed = await runFindCodePipeline('"function" in src/llm.ts', mockConfig, false, root)
     const lines = parsed.structuredContent.symbols.split('\n').slice(1).filter(Boolean)
     const symbolNames = lines.map((l: string) => l.split('|').slice(0, 2).join('|'))
     const unique = new Set(symbolNames)

@@ -18,11 +18,17 @@ export function registerFindFilesTool(server: McpServer): void {
   const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
-      const text = await runFindFiles(args.pattern, root)
-      return { content: [{ type: 'text' as const, text }] }
+      const res = await runFindFiles(args.pattern, root)
+      return {
+        content: [{ type: 'text' as const, text: res.markdown }],
+        structuredContent: res.structuredContent as unknown as Record<string, unknown>,
+      }
     } catch (err) {
       const errorMsg = errorMessage(err)
-      return { content: [{ type: 'text' as const, text: formatDegraded(`find_files failed: ${errorMsg}`) }] }
+      return {
+        content: [{ type: 'text' as const, text: formatDegraded(`find_files failed: ${errorMsg}`) }],
+        isError: true,
+      }
     }
   }
 

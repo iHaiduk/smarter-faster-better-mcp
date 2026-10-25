@@ -105,25 +105,33 @@ describe('serializeForLLM', () => {
 })
 
 describe('toStructuredJSON', () => {
-  test('compacts structured symbols into tabular format and comma-separated deps list', () => {
-    const out = toStructuredJSON('md', [{ ...baseExtraction, typeDefs: ['type:X'], relevanceTier: 'mustRead' }], 0.9, 'why')
-    const parsed = JSON.parse(out) as {
-      markdown: string
-      structuredContent: {
-        symbols: string
-        deps: string
-        confidence: number
-        reason: string
-      }
-    }
+  test('compacts structured symbols into tabular format and comma-separated deps list without JSON-escaping markdown', () => {
+    const out = toStructuredJSON('md\nwith "quotes" and newlines', [{ ...baseExtraction, typeDefs: ['type:X'], relevanceTier: 'mustRead' }], 0.9, 'why')
 
-    expect(parsed.markdown).toBe('md')
-    expect(parsed.structuredContent.symbols).toContain('file|symbol|lines|tier|status')
-    expect(parsed.structuredContent.symbols).toContain('src/cache.ts|userCache|10-20|mustRead|ok')
-    expect(parsed.structuredContent.deps).toContain('./types.js')
-    expect(parsed.structuredContent.deps).toContain('src/index.ts')
-    expect(parsed.structuredContent.confidence).toBe(0.9)
-    expect(parsed.structuredContent.reason).toBe('why')
+    expect(out.markdown).toBe('md\nwith "quotes" and newlines')
+    expect(out.markdown).not.toContain('\\n')
+    expect(out.markdown).not.toContain('\\"')
+    expect(out.structuredContent.symbols).toContain('file|symbol|lines|tier|status')
+    expect(out.structuredContent.symbols).toContain('src/cache.ts|userCache|10-20|mustRead|ok')
+    expect(out.structuredContent.deps).toContain('./types.js')
+    expect(out.structuredContent.deps).toContain('src/index.ts')
+    expect(out.structuredContent.confidence).toBe(0.9)
+    expect(out.structuredContent.reason).toBe('why')
+  })
+
+  test('for a 100-line slice, response chars <= raw slice chars + 10%', () => {
+    const raw100Lines = Array.from({ length: 100 }, (_, i) => `const line${i} = "statement ${i}";`).join('\n')
+    const extraction: ExtractedSymbol = {
+      ...baseExtraction,
+      code: raw100Lines,
+    }
+    const markdown = formatFound([extraction])
+    const out = toStructuredJSON(markdown, [extraction], 1.0, 'test')
+
+    // Plain text markdown length vs raw slice chars
+    // Raw slice has ~3500 chars, markdown headers add < 200 chars (< 10%)
+    expect(out.markdown.length).toBeLessThanOrEqual(raw100Lines.length * 1.1)
+    expect(out.markdown).not.toContain('\\n')
   })
 
   test('resolves exact dependency lines when ProjectMap is provided and imports are used', () => {
@@ -176,8 +184,7 @@ describe('toStructuredJSON', () => {
       [],
       mockMap,
     )
-    const parsed = JSON.parse(out)
 
-    expect(parsed.structuredContent.deps).toBe('src/dep.ts[42]')
+    expect(out.structuredContent.deps).toBe('src/dep.ts[42]')
   })
 })

@@ -10,7 +10,7 @@ import { resolveBudget } from '../../shared/constants/budget.js'
 import { shouldIgnorePath } from '../../shared/constants/ignore-rules.js'
 import { matchGlob } from '../../shared/utils/glob.js'
 
-import type { ContextBudgetOptions, ExtractedSymbol, LLMCandidate, ProjectMap } from '../../shared/types/index.js'
+import type { ContextBudgetOptions, ExtractedSymbol, LLMCandidate, ProjectMap, ToolResultPayload } from '../../shared/types/index.js'
 
 // Custom search limits — keep custom regex search bounded to prevent ReDoS / DoS.
 const CUSTOM_SEARCH_MAX_PATTERN_LEN = 200
@@ -84,7 +84,7 @@ export async function runCustomSearch(
   query: CustomQuery,
   targetRoot: string,
   budget: ContextBudgetOptions,
-): Promise<string> {
+): Promise<ToolResultPayload> {
   const { pattern, globPattern } = query
   const regex = compileSearchRegex(pattern)
 

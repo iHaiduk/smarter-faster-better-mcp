@@ -19,11 +19,17 @@ export function registerExplainContextPackTool(server: McpServer, config: ScoutC
   const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
-      const text = await runExplainContextPack(args.task, config, root)
-      return { content: [{ type: 'text' as const, text }] }
+      const res = await runExplainContextPack(args.task, config, root)
+      return {
+        content: [{ type: 'text' as const, text: res.markdown }],
+        structuredContent: res.structuredContent as unknown as Record<string, unknown>,
+      }
     } catch (err) {
       const errorMsg = errorMessage(err)
-      return { content: [{ type: 'text' as const, text: formatDegraded(`explain_context_pack failed: ${errorMsg}`) }] }
+      return {
+        content: [{ type: 'text' as const, text: formatDegraded(`explain_context_pack failed: ${errorMsg}`) }],
+        isError: true,
+      }
     }
   }
 

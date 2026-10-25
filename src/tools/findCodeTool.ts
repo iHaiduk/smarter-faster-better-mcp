@@ -30,12 +30,18 @@ export function registerFindCodeTool(server: McpServer, config: ScoutConfig): vo
   const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
-      const text = await runFindCodePipeline(args.task, config, args.summaryOnly === true, root, args)
-      return { content: [{ type: 'text' as const, text }] }
+      const res = await runFindCodePipeline(args.task, config, args.summaryOnly === true, root, args)
+      return {
+        content: [{ type: 'text' as const, text: res.markdown }],
+        structuredContent: res.structuredContent as unknown as Record<string, unknown>,
+      }
     } catch (err) {
       const errorMsg = errorMessage(err)
       console.error('[Scout] Unexpected find_code pipeline error:', errorMsg)
-      return { content: [{ type: 'text' as const, text: formatDegraded(`Unexpected error: ${errorMsg}`) }] }
+      return {
+        content: [{ type: 'text' as const, text: formatDegraded(`Unexpected error: ${errorMsg}`) }],
+        isError: true,
+      }
     }
   }
 

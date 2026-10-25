@@ -1,7 +1,7 @@
 import { readMap } from '../cache/map-cache.js'
 import { analyzeDeadCode, type DeadCodeOptions } from '../analysis/dead-code.js'
 import { toStructuredJSON } from '../bundle/formatter/format.js'
-import type { ExtractedSymbol } from '../shared/types/index.js'
+import type { ExtractedSymbol, ToolResultPayload } from '../shared/types/index.js'
 
 /**
  * Runs dead code analysis and formats readable markdown + structured payload.
@@ -9,7 +9,7 @@ import type { ExtractedSymbol } from '../shared/types/index.js'
 export async function runDeadCodePipeline(
   targetRoot = process.cwd(),
   options: DeadCodeOptions = {},
-): Promise<string> {
+): Promise<ToolResultPayload> {
   const map = await readMap(targetRoot)
   const report = await analyzeDeadCode(targetRoot, map, options)
 

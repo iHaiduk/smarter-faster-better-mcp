@@ -112,6 +112,11 @@ export interface StructuredOutput {
   readonly staleIndexWarning?: boolean
 }
 
+export interface ToolResultPayload {
+  readonly markdown: string
+  readonly structuredContent: StructuredOutput
+}
+
 export * from './jev.js'
 
 export interface ScoutConfig {

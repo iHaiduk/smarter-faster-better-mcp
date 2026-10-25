@@ -34,15 +34,21 @@ export function registerDeadCodeTool(server: McpServer): void {
   const handler = async (args: z.infer<z.ZodObject<typeof SCHEMA>>) => {
     const root = resolveWorkspaceRoot(args.workspaceRoot)
     try {
-      const text = await runDeadCodePipeline(root, {
+      const res = await runDeadCodePipeline(root, {
         entrypoints: args.entrypoints,
         includeExports: args.includeExports,
         minConfidence: args.minConfidence,
       })
-      return { content: [{ type: 'text' as const, text }] }
+      return {
+        content: [{ type: 'text' as const, text: res.markdown }],
+        structuredContent: res.structuredContent as unknown as Record<string, unknown>,
+      }
     } catch (err) {
       const errorMsg = errorMessage(err)
-      return { content: [{ type: 'text' as const, text: formatDegraded(`dead_code failed: ${errorMsg}`) }] }
+      return {
+        content: [{ type: 'text' as const, text: formatDegraded(`dead_code failed: ${errorMsg}`) }],
+        isError: true,
+      }
     }
   }
 
