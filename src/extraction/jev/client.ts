@@ -30,6 +30,20 @@ export function getTypeSafeClient(config?: ScoutConfig): TypeSafeClient | null {
   cachedClient = new TypeSafeClient({
     apiKey,
     baseURL: customBaseUrl || undefined,
+    fetch: async (url, init) => {
+      const res = await fetch(url, init)
+      const text = await res.text()
+      const wrapped = new Response(text, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: res.headers,
+      })
+      // Under Bun, SDK's bufferResponse calls response.body?.getReader(), locking the stream
+      // and causing ERR_BODY_ALREADY_USED during parseBody. Nullifying the body getter
+      // allows parseBody -> res.text() to read the buffered payload cleanly.
+      Object.defineProperty(wrapped, 'body', { get: () => null })
+      return wrapped
+    },
   })
   cachedApiKey = apiKey
 

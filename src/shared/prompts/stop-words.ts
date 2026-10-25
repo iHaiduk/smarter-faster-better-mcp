@@ -1,7 +1,8 @@
 export const STOP_WORDS: ReadonlySet<string> = new Set([
   'the', 'a', 'an', 'for', 'to', 'in', 'of', 'and', 'or', 'is', 'it', 'how',
   'where', 'what', 'with', 'that', 'this', 'does', 'do', 'can', 'should',
-  'want', 'need', 'from', 'about',
+  'want', 'need', 'from', 'about', 'are', 'using', 'been', 'were', 'was',
+  'into', 'when', 'which', 'all',
 ] as const)
 
 /**

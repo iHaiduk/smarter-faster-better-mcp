@@ -3,40 +3,242 @@ import * as fs from 'node:fs/promises'
 
 import { isCacheStale } from '../cache/l1.js'
 import { extractWithOxc } from '../extraction/extract.js'
-import { filterMap, getDeterministicMatches, extractCodeIdentifiers } from '../extraction/matcher/filter.js'
+import { getDeterministicMatches, extractCodeIdentifiers } from '../extraction/matcher/filter.js'
 import {
   formatFound,
   formatNotFound,
-  serializeForLLM,
   toStructuredJSON,
 } from '../bundle/formatter/format.js'
-import { getGitStatusMap, getGitHint, getFileWorktreeStatuses } from '../shared/utils/git.js'
-import { askCheapLLM } from '../extraction/llm.js'
+import { getGitStatusMap } from '../shared/utils/git.js'
 import { findDeps } from '../dependency-resolver/deps.js'
 import { buildMap } from '../indexing/symbol-map/build-map.js'
-import { isTestFile } from '../shared/constants/test-suffixes.js'
-import { TIER_SCORE } from '../shared/constants/tier-scores.js'
 import { resolveBudget } from '../shared/constants/budget.js'
 import { parseCustomQuery, runCustomSearch } from '../extraction/custom-search/searcher.js'
 import { analyzeQuery } from '../extraction/query-analyzer.js'
-import { validateExtractedSymbols } from '../extraction/content-validator.js'
-import { readMap, lookupCached, storeCached, chunkSymbols } from '../cache/map-cache.js'
+import { readMap } from '../cache/map-cache.js'
 import { resolveSecurePath } from './resolve-path.js'
-import { filesystemSymbolSearch } from './fs-search.js'
+import { selectCoarseCandidates, jevFilterCandidates } from '../extraction/jev/dynamic-triage.js'
+import { parseFile } from '../indexing/parser/oxc-walker.js'
+import { loadTsConfigPaths } from '../indexing/resolver/tsconfig-paths.js'
+import { STOP_WORDS } from '../shared/prompts/stop-words.js'
 
 import type {
+  CandidateEvaluation,
   ExtractedSymbol,
+  FileMetadata,
   LLMCandidate,
   ProjectMap,
-  QueryAnalysis,
   ScoutConfig,
+  SymbolEntry,
   ContextBudgetOptions,
-  RelevanceTier,
   ToolResultPayload,
 } from '../shared/types/index.js'
 
-const MAX_CHUNKS = 5
 const FILE_CONTEXT_SYMBOL = 'FILE_CONTEXT'
+
+function stemWord(word: string): string[] {
+  const forms = [word]
+  if (word.endsWith('ed')) {
+    const stripped = word.slice(0, -2)
+    forms.push(stripped, word.slice(0, -1))
+    if (stripped.length >= 3 && stripped[stripped.length - 1] === stripped[stripped.length - 2]) {
+      forms.push(stripped.slice(0, -1))
+    }
+  }
+  if (word.endsWith('ing')) {
+    const stripped = word.slice(0, -3)
+    forms.push(stripped, stripped + 'e')
+    if (stripped.length >= 3 && stripped[stripped.length - 1] === stripped[stripped.length - 2]) {
+      forms.push(stripped.slice(0, -1))
+    }
+  }
+  if (word.endsWith('er') || word.endsWith('or')) {
+    const stripped = word.slice(0, -2)
+    forms.push(stripped)
+    if (stripped.length >= 3 && stripped[stripped.length - 1] === stripped[stripped.length - 2]) {
+      forms.push(stripped.slice(0, -1))
+    }
+  }
+  if (word.endsWith('ies')) forms.push(word.slice(0, -3) + 'y', word.slice(0, -3), 'dep', 'deps')
+  if (word.endsWith('s') && !word.endsWith('ss')) forms.push(word.slice(0, -1))
+  if (word === 'deps' || word === 'dependency' || word === 'dependencies') {
+    forms.push('dep', 'deps', 'depend', 'dependencies')
+  }
+  return [...new Set(forms.filter((f) => f.length >= 3))]
+}
+
+export function extractTaskTerms(task: string): string[] {
+  const codeIds = extractCodeIdentifiers(task)
+  const words = task
+    .toLowerCase()
+    .split(/[\s\W_]+/)
+    .filter((w) => w.length >= 3 && !STOP_WORDS.has(w))
+  const stemmed = words.flatMap((w) => stemWord(w))
+  return [...new Set([...codeIds, ...words, ...stemmed])]
+}
+
+function matchSymbolsInFile(
+  fileSymbols: readonly SymbolEntry[],
+  task: string,
+  terms: readonly string[],
+): SymbolEntry[] {
+  const exactNames = new Set(extractCodeIdentifiers(task).map((id) => id.toLowerCase()))
+  const scored = fileSymbols.map((sym) => {
+    const symLower = sym.name.toLowerCase()
+    let score = 0
+    if (exactNames.has(symLower)) {
+      score += 100
+    }
+    for (const term of terms) {
+      const termLower = term.toLowerCase()
+      if (symLower === termLower) score += 50
+      else if (symLower.startsWith(termLower)) score += 35
+      else if (symLower.includes(termLower) || (termLower.length >= 4 && termLower.includes(symLower))) score += 20
+    }
+    return { sym, score }
+  })
+
+  const matching = scored
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score || a.sym.line - b.sym.line)
+  if (matching.length > 0) {
+    return matching.slice(0, 3).map((m) => m.sym)
+  }
+  return []
+}
+
+export async function ensureFileFreshness(
+  filePath: string,
+  map: ProjectMap,
+  targetRoot: string,
+): Promise<boolean> {
+  try {
+    const absPath = path.resolve(targetRoot, filePath)
+    const st = await fs.stat(absPath)
+    if (st.mtimeMs > map.generatedAt) {
+      const tsconfig = await loadTsConfigPaths(targetRoot)
+      const parsed = await parseFile(filePath, targetRoot, 'auto', tsconfig.paths, tsconfig.baseUrl)
+      const otherSymbols = map.symbols.filter((s) => s.file !== filePath)
+      const otherFiles = (map.files ?? []).filter((f) => f.file !== filePath)
+      ;(map as unknown as { symbols: SymbolEntry[] }).symbols = [...otherSymbols, ...parsed.symbols]
+      ;(map as unknown as { files: FileMetadata[] }).files = [...otherFiles, parsed.metadata]
+      return true
+    }
+  } catch {
+    // If stat fails (e.g. file deleted), do not crash
+  }
+  return false
+}
+
+interface FileRenderPayload {
+  readonly file: string
+  readonly score: number
+  readonly verdict?: string
+  readonly isOutline: boolean
+  readonly symbols: ExtractedSymbol[]
+  readonly relatedTypes: { name: string; file: string; line: number; code: string }[]
+  readonly outlineMessage?: string
+}
+
+function renderFilePayload(
+  payload: FileRenderPayload,
+  stage: 'full' | 'no-types' | 'folded',
+): string {
+  const sections: string[] = []
+  const scorePercent = payload.score ? ` (score: ${(payload.score * 100).toFixed(0)}%)` : ''
+  const verdictLine = payload.verdict ? `Verdict: ${payload.verdict}` : ''
+
+  sections.push(`### ${payload.file}${scorePercent}`)
+  if (verdictLine) sections.push(verdictLine)
+
+  if (payload.isOutline) {
+    sections.push(payload.outlineMessage ?? '// No symbol matched query identifiers')
+    for (const s of payload.symbols) {
+      const loc = s.startLine && s.endLine ? `:L${s.startLine}-${s.endLine}` : ''
+      sections.push(`- ${s.signature || s.candidate.symbol} (${payload.file}${loc})`)
+    }
+    return sections.join('\n')
+  }
+
+  for (const sym of payload.symbols) {
+    const loc = sym.startLine && sym.endLine ? `:L${sym.startLine}-${sym.endLine}` : ''
+    sections.push(`#### ${sym.candidate.symbol} (${payload.file}${loc})`)
+
+    if (stage === 'folded') {
+      const lineCount = sym.startLine && sym.endLine ? sym.endLine - sym.startLine + 1 : 1
+      sections.push(`\`\`\`ts\n// L${sym.startLine ?? 1}-L${sym.endLine ?? 1} [folded ${lineCount} lines]\n${sym.signature || sym.candidate.symbol}\n\`\`\``)
+    } else {
+      sections.push(`\`\`\`ts\n${sym.code || sym.signature}\n\`\`\``)
+    }
+
+    const metaParts: string[] = []
+    if (sym.imports.length > 0) metaParts.push(`Imports: ${sym.imports.slice(0, 5).join(', ')}`)
+    if (sym.importedBy.length > 0) metaParts.push(`Used by: ${sym.importedBy.slice(0, 5).join(', ')}`)
+    if (metaParts.length > 0) sections.push(metaParts.join(' | '))
+  }
+
+  if (stage === 'full' && payload.relatedTypes.length > 0) {
+    for (const rt of payload.relatedTypes.slice(0, 2)) {
+      sections.push(`##### Related Type: ${rt.name} (${rt.file}:L${rt.line})`)
+      sections.push(`\`\`\`ts\n${rt.code}\n\`\`\``)
+    }
+  }
+
+  return sections.join('\n')
+}
+
+function renderWithBudgetWaterfall(
+  payloads: FileRenderPayload[],
+  maxChars = 12000,
+  jevDegraded = false,
+): { markdown: string; omittedFilesCount: number; isFolded: boolean } {
+  const filesToRender = [...payloads]
+  let stage: 'full' | 'no-types' | 'folded' = 'full'
+  let omittedFilesCount = 0
+
+  const getFullMarkdown = (list: FileRenderPayload[], currentStage: 'full' | 'no-types' | 'folded') => {
+    return list.map((p) => renderFilePayload(p, currentStage)).join('\n\n')
+  }
+
+  let text = getFullMarkdown(filesToRender, stage)
+
+  // Stage 1: Drop lowest-scored files until <= maxChars (keeping at least 1 file)
+  while (text.length > maxChars && filesToRender.length > 1) {
+    filesToRender.sort((a, b) => b.score - a.score)
+    filesToRender.pop()
+    omittedFilesCount++
+    text = getFullMarkdown(filesToRender, stage)
+  }
+
+  // Stage 2: Drop related types if still over budget
+  if (text.length > maxChars) {
+    stage = 'no-types'
+    text = getFullMarkdown(filesToRender, stage)
+  }
+
+  // Stage 3: Fold symbol bodies to one-line signatures if still over budget
+  let isFolded = false
+  if (text.length > maxChars) {
+    stage = 'folded'
+    isFolded = true
+    text = getFullMarkdown(filesToRender, stage)
+  }
+
+  // Stage 4: Hard slice if single file is huge
+  if (text.length > maxChars) {
+    text = text.slice(0, maxChars - 300) + '\n... [truncated to fit budget]'
+  }
+
+  const footerParts = [
+    `Scout Budget: ${text.length} chars / ${maxChars} limit`,
+  ]
+  if (omittedFilesCount > 0) footerParts.push(`dropped ${omittedFilesCount} file(s)`)
+  if (isFolded) footerParts.push('folded bodies to signatures')
+  if (jevDegraded) footerParts.push('Jev: fallback mode')
+
+  const finalMarkdown = `[Scout: FOUND]\n\n${text}\n\n---\n[${footerParts.join(' | ')}]`
+  return { markdown: finalMarkdown, omittedFilesCount, isFolded }
+}
 
 /** Runs the full find_code pipeline and returns unified structured JSON containing human-markdown. */
 export async function runFindCodePipeline(
@@ -62,206 +264,155 @@ export async function runFindCodePipeline(
   }
 
   const resolvedBudget = resolveBudget(budget)
-  const { maxFiles, maxSymbols, maxChars, includeTests } = resolvedBudget
+  const maxChars = resolvedBudget.maxChars || 12000
 
-  // Step 1: Analyze query to understand intent and extract search terms
-  const analysis = await analyzeQuery(task, config)
-  if (analysis) {
-    console.error(
-      `[Scout] Query analysis: intent=${analysis.intent}, symbols=[${analysis.symbolNames.join(',')}], terms=[${analysis.expandedTerms.slice(0, 5).join(',')}]`,
-    )
+  // 1. Extract search terms & identifiers
+  const terms = extractTaskTerms(task)
+  const analysis = await analyzeQuery(task, config).catch(() => null)
+  if (analysis?.symbolNames) {
+    terms.push(...analysis.symbolNames)
   }
 
-  // Step 2: Deterministic matching (enhanced with analysis)
-  const deterministicCandidates = getDeterministicMatches(map, task, includeTests, analysis)
-  const firstCandidate = deterministicCandidates[0]
-  const deterministicConfidence = firstCandidate?.confidence ?? 0
-  const hasHighConfidenceMatch = deterministicConfidence >= 0.95
+  // 2. Deterministic candidate check
+  const deterministicCandidates = getDeterministicMatches(map, task, resolvedBudget.includeTests, analysis)
+  const deterministicFiles = [...new Set(deterministicCandidates.map((c) => c.file))]
 
-  let candidates: LLMCandidate[]
-  let isDeterministic: boolean
+  // 3. Coarse candidate selection (up to 8 files)
+  const coarseFiles = selectCoarseCandidates(map, terms, undefined, 8)
+  const candidateFiles = [...new Set([...deterministicFiles, ...coarseFiles])].slice(0, 8)
 
-  if (hasHighConfidenceMatch) {
-    candidates = deterministicCandidates
-    isDeterministic = true
-    console.error(`[Scout] Skipped cheap LLM (Deterministic Match Confidence: ${deterministicConfidence})`)
-  } else {
-    // Step 3: LLM-assisted matching (enhanced with analysis context)
-    const filtered = filterMap(map, task, analysis)
-    const chunkCount = Math.max(1, Math.min(config.llmParallelism, MAX_CHUNKS))
-    const chunks = chunkSymbols(filtered, chunkCount)
-
-    const [compactMaps, gitHint] = await Promise.all([
-      Promise.resolve(chunks.map(serializeForLLM)),
-      getGitHint(targetRoot),
-    ])
-
-    const llmResult = await askCheapLLM(task, compactMaps, gitHint, config, analysis)
-
-    if (llmResult) {
-      candidates = llmResult
-      isDeterministic = false
-    } else {
-      console.error('[Scout] Cheap LLM degraded. Falling back to deterministic matches.')
-      candidates = deterministicCandidates.filter((c) => c.confidence >= 0.5)
-      isDeterministic = false
-    }
-  }
-
-  const knownSymbols = new Set(map.symbols.map((s) => `${s.file}\0${s.name}`))
-  const validatedCandidates = candidates
-    .filter((c) => knownSymbols.has(`${c.file}\0${c.symbol}`))
-    .toSorted((a, b) => b.confidence - a.confidence)
-
-  // Filesystem fallback: trigger when no candidates found OR when best candidate
-  // has very low relevance (LLM returned irrelevant files).
-  const bestConfidence = validatedCandidates[0]?.confidence ?? 0
-  const needsFallback = validatedCandidates.length === 0 || bestConfidence < 0.5
-
-  if (needsFallback) {
-    const fallbackResult = await tryFilesystemFallback(task, analysis, targetRoot, {
-      summaryOnly, includeTests, maxFiles, maxSymbols, maxChars,
-    })
-    if (fallbackResult) return fallbackResult
-  }
-
-  // Only return NOT_FOUND if there were truly no candidates at all
-  if (validatedCandidates.length === 0) {
+  if (candidateFiles.length === 0) {
     const markdown = formatNotFound(task, map.symbolsCount)
     return toStructuredJSON(markdown, [], 0, 'No matching symbols found.', [], [], map)
   }
 
-  const rankedCandidates = new Map<string, { candidate: LLMCandidate; tier: RelevanceTier }>()
-  for (const c of validatedCandidates) {
-    const tier: RelevanceTier = c.tier ?? (c.confidence >= 0.7 ? 'mustRead' : 'likelyRelevant')
-    if (tier === 'excluded') {
-      console.error(`[Scout] Pruning excluded candidate: ${c.file}::${c.symbol}`)
-      continue
+  // 4. Jev System-1 Filtering (keep up to 5, recall guarded: drop only on clear no with p <= 0.3)
+  const jevRes = await jevFilterCandidates(map, candidateFiles, task, undefined, config, 5)
+  const survivingFiles: readonly {
+    file: string
+    score: number
+    evaluations?: CandidateEvaluation['evaluations']
+  }[] =
+    jevRes.kept.length > 0
+      ? jevRes.kept
+      : candidateFiles.slice(0, 1).map((f) => ({ file: f, score: 0.5, evaluations: undefined }))
+
+  // 5. Freshness check for surviving files
+  await Promise.all(survivingFiles.map((f) => ensureFileFreshness(f.file, map, targetRoot)))
+
+  // 6. For each surviving file, pick symbols & extract
+  const filePayloads: FileRenderPayload[] = []
+  const allExtractedSymbols: ExtractedSymbol[] = []
+
+  for (const item of survivingFiles) {
+    const fileSymbols = map.symbols.filter((s) => s.file === item.file)
+    const matchingSymbols = matchSymbolsInFile(fileSymbols, task, terms)
+
+    let verdictStr = item.score ? `[Relevance score: ${(item.score * 100).toFixed(0)}%]` : undefined
+    const rel = item.evaluations?.['relevance']
+    if (rel && rel.type === 'check') {
+      verdictStr = `[Jev: ${rel.verdict} (p=${(rel.probability * 100).toFixed(0)}%)]`
     }
-    rankedCandidates.set(`${c.file}::${c.symbol}`, { candidate: c, tier })
-  }
 
-  const byTierThenConfidence = (
-    a: { candidate: LLMCandidate; tier: RelevanceTier },
-    b: { candidate: LLMCandidate; tier: RelevanceTier },
-  ): number => {
-    const scoreDiff = TIER_SCORE[b.tier] - TIER_SCORE[a.tier]
-    return scoreDiff !== 0 ? scoreDiff : b.candidate.confidence - a.candidate.confidence
-  }
-
-  let rankedList = [...rankedCandidates.values()].toSorted(byTierThenConfidence)
-
-  if (!includeTests) {
-    rankedList = rankedList.filter((item) => !isTestFile(item.candidate.file))
-  } else {
-    rankedList = rankedList.map((item) =>
-      isTestFile(item.candidate.file) ? { ...item, tier: 'testsOrExamples' as RelevanceTier } : item,
-    )
-  }
-
-  const budgetedResults = await applyBudget(rankedList, summaryOnly, map, targetRoot, maxFiles, maxSymbols, maxChars)
-
-  // Step 4: Validate extracted content against query to filter false positives.
-  // Skip for deterministic high-confidence matches — the symbol name IS in the project map,
-  // so content is guaranteed correct; running validation would waste an LLM call.
-  const validatedSymbols =
-    isDeterministic && deterministicConfidence >= 0.95
-      ? budgetedResults.symbols
-      : await validateExtractedSymbols(budgetedResults.symbols, task, analysis, config)
-
-  const gitStatusMap = await getGitStatusMap(targetRoot)
-  const mainMarkdown = formatFound(validatedSymbols, gitStatusMap)
-
-  // Check for stale index (files changed since last build)
-  const resultFiles = [...new Set(validatedSymbols.map((s) => s.candidate.file))]
-  const worktreeStatuses = await getFileWorktreeStatuses(resultFiles, targetRoot, map.generatedAt)
-  const hasStaleIndex = worktreeStatuses.some((s) => !s.indexFresh)
-
-  const reason = isDeterministic
-    ? 'Identified via high-confidence deterministic naming preflight.'
-    : 'Identified via LLM-assisted context extraction.'
-
-  const missingContextHints = budgetedResults.omittedCount > 0
-    ? [`Omitted ${budgetedResults.omittedCount} lower-priority symbols because of context budget limits.`]
-    : []
-
-  if (hasStaleIndex) {
-    missingContextHints.push('Some files have changed since the last index build. Results may be incomplete.')
-  }
-
-  const followUpQueries = validatedSymbols
-    .filter((r) => r.relevanceTier === 'mustRead')
-    .map((r) => `trace_symbol: ${r.candidate.symbol}`)
-
-  return toStructuredJSON(
-    mainMarkdown,
-    validatedSymbols,
-    validatedSymbols[0]?.candidate.confidence ?? 1.0,
-    reason,
-    missingContextHints,
-    followUpQueries,
-    map,
-    undefined,
-    hasStaleIndex,
-  )
-}
-
-interface BudgetResult {
-  readonly symbols: ExtractedSymbol[]
-  readonly omittedCount: number
-}
-
-/**
- * Enforces file/symbol/char budget against a pre-ranked list.
- * Extractions are serial because each result contributes to the rolling char count.
- */
-async function applyBudget(
-  rankedList: ReadonlyArray<{ candidate: LLMCandidate; tier: RelevanceTier }>,
-  summaryOnly: boolean,
-  map: ProjectMap,
-  targetRoot: string,
-  maxFiles: number,
-  maxSymbols: number,
-  maxChars: number,
-): Promise<BudgetResult> {
-  const symbols: ExtractedSymbol[] = []
-  let omittedCount = 0
-  let charsUsed = 0
-  const seenFiles = new Set<string>()
-
-  for (const item of rankedList) {
-    const { candidate, tier } = item
-
-    const wouldExceedFiles = seenFiles.size >= maxFiles && !seenFiles.has(candidate.file)
-    const wouldExceedSymbols = symbols.length >= maxSymbols
-    const wouldExceedChars = charsUsed >= maxChars
-
-    if (wouldExceedFiles || wouldExceedSymbols || wouldExceedChars) {
-      omittedCount++
+    if (matchingSymbols.length === 0) {
+      // Outline fallback
+      const outlineSymbols: ExtractedSymbol[] = fileSymbols.slice(0, 15).map((s) => ({
+        candidate: { file: item.file, symbol: s.name, confidence: item.score },
+        code: '',
+        signature: s.signature || s.name,
+        doc: s.doc,
+        imports: [],
+        importedBy: [],
+        extractionOk: true,
+        startLine: s.line,
+        endLine: s.line,
+      }))
+      filePayloads.push({
+        file: item.file,
+        score: item.score,
+        verdict: verdictStr,
+        isOutline: true,
+        symbols: outlineSymbols,
+        relatedTypes: [],
+        outlineMessage: `// No symbol matched query identifiers in this file`,
+      })
+      allExtractedSymbols.push(...outlineSymbols)
       continue
     }
 
-    const effectiveSummaryOnly = summaryOnly || tier === 'dependencyOnly'
+    // Extract matching symbols
+    const extractedForFile: ExtractedSymbol[] = []
+    const relatedTypesForFile: { name: string; file: string; line: number; code: string }[] = []
 
-    const cached = await lookupCached(candidate, effectiveSummaryOnly, targetRoot)
-    let extracted: ExtractedSymbol
-
-    if (cached) {
-      extracted = { ...cached }
-    } else {
-      extracted = await extractWithOxc(candidate, map, effectiveSummaryOnly, targetRoot)
+    for (const sym of matchingSymbols) {
+      const candidate: LLMCandidate = {
+        file: sym.file,
+        symbol: sym.name,
+        confidence: item.score,
+      }
+      const extracted = await extractWithOxc(candidate, map, summaryOnly, targetRoot)
       const graphImporters = await findDeps(candidate.symbol, candidate.file, map)
       extracted.importedBy = graphImporters
-      await storeCached(extracted, effectiveSummaryOnly, targetRoot)
+      extractedForFile.push(extracted)
+      allExtractedSymbols.push(extracted)
+
+      // Find related types
+      if (!summaryOnly && extracted.code) {
+        const related = findRelatedTypesInCode(extracted.code, map, sym.file)
+        for (const rt of related) {
+          const typeSlice = await readTypeSlice(targetRoot, rt)
+          if (typeSlice) {
+            relatedTypesForFile.push({
+              name: rt.name,
+              file: rt.file,
+              line: rt.line,
+              code: typeSlice,
+            })
+          }
+        }
+      }
     }
 
-    extracted.relevanceTier = tier
-    symbols.push(extracted)
-    seenFiles.add(candidate.file)
-    charsUsed += extracted.code.length
+    filePayloads.push({
+      file: item.file,
+      score: item.score,
+      verdict: verdictStr,
+      isOutline: false,
+      symbols: extractedForFile,
+      relatedTypes: relatedTypesForFile,
+    })
   }
 
-  return { symbols, omittedCount }
+  // 7. Apply Budget Waterfall
+  const { markdown, omittedFilesCount, isFolded } = renderWithBudgetWaterfall(
+    filePayloads,
+    maxChars,
+    jevRes.degraded,
+  )
+
+  const topConfidence = survivingFiles[0]?.score ?? 1.0
+  const reason = jevRes.degraded
+    ? 'Identified via deterministic candidate matching (Jev offline).'
+    : 'Filtered and verified via TypeSafe Jev System-1.'
+
+  const hints: string[] = []
+  if (omittedFilesCount > 0) hints.push(`Omitted ${omittedFilesCount} lower-priority files due to char budget limit.`)
+  if (isFolded) hints.push('Code bodies folded to signatures due to char budget limit.')
+
+  const followUpQueries = allExtractedSymbols
+    .filter((s) => s.candidate.symbol !== FILE_CONTEXT_SYMBOL)
+    .slice(0, 5)
+    .map((s) => `trace_symbol: ${s.candidate.symbol}`)
+
+  return toStructuredJSON(
+    markdown,
+    allExtractedSymbols,
+    topConfidence,
+    reason,
+    hints,
+    followUpQueries,
+    map,
+  )
 }
 
 /** Traces callers, re-exports, and dependencies of a symbol. */
@@ -435,58 +586,6 @@ async function readTypeSlice(
   } catch {
     return null
   }
-}
-
-interface FallbackBudget {
-  readonly summaryOnly: boolean
-  readonly includeTests: boolean
-  readonly maxFiles: number
-  readonly maxSymbols: number
-  readonly maxChars: number
-}
-
-async function tryFilesystemFallback(
-  task: string,
-  analysis: QueryAnalysis | null | undefined,
-  targetRoot: string,
-  budget: FallbackBudget,
-): Promise<ToolResultPayload | null> {
-  const exactIdentifiers = extractCodeIdentifiers(task)
-  const analysisSymbols = analysis?.symbolNames ?? []
-  const allSymbolNames = [...new Set([...exactIdentifiers, ...analysisSymbols])]
-  if (allSymbolNames.length === 0) return null
-
-  console.error(`[Scout] Weak matches. Trying filesystem fallback for: ${allSymbolNames.join(', ')}`)
-  const fsMatches = await filesystemSymbolSearch(allSymbolNames, targetRoot)
-  if (fsMatches.length === 0) return null
-
-  console.error(`[Scout] Filesystem fallback found ${fsMatches.length} symbols. Rebuilding index...`)
-  await buildMap(targetRoot)
-  const freshMap = await readMap(targetRoot)
-
-  const freshCandidates = getDeterministicMatches(freshMap, task, budget.includeTests, analysis)
-  const freshValidated = freshCandidates.filter((c) => c.confidence >= 0.8)
-  if (freshValidated.length === 0) return null
-
-  console.error(`[Scout] Fresh index matched ${freshValidated.length} candidates after rebuild.`)
-  const freshRanked = freshValidated.map((c) => ({
-    candidate: c,
-    tier: (c.confidence >= 0.95 ? 'mustRead' : 'likelyRelevant') as RelevanceTier,
-  }))
-
-  const budgetedResults = await applyBudget(freshRanked, budget.summaryOnly, freshMap, targetRoot, budget.maxFiles, budget.maxSymbols, budget.maxChars)
-  const gitStatusMap = await getGitStatusMap(targetRoot)
-  const mainMarkdown = formatFound(budgetedResults.symbols, gitStatusMap)
-
-  return toStructuredJSON(
-    mainMarkdown,
-    budgetedResults.symbols,
-    budgetedResults.symbols[0]?.candidate.confidence ?? 1.0,
-    `Found via filesystem fallback and index rebuild. Symbols: ${allSymbolNames.join(', ')}`,
-    [`Index was stale — symbols found on disk but not in cached map. Index has been rebuilt.`],
-    budgetedResults.symbols.map((r) => `trace_symbol: ${r.candidate.symbol}`),
-    freshMap,
-  )
 }
 
 /**

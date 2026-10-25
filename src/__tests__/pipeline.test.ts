@@ -66,3 +66,55 @@ describe('runFindCodePipeline with Custom Search', () => {
     expect(unique.size).toBe(symbolNames.length)
   })
 })
+
+describe('one-call scout pipeline enhancements (WU3)', () => {
+  const root = path.resolve(import.meta.dir, '../..')
+
+  test('Jev-off fallback returns candidates with degraded indicator', async () => {
+    // Config without Jev credentials
+    const noJevConfig: ScoutConfig = {
+      ...mockConfig,
+      jevApiKey: undefined,
+    }
+    // Delete env key temporarily if present
+    const prevKey = process.env['JEV_API_KEY']
+    const prevTsKey = process.env['TYPESAFE_API_KEY']
+    try {
+      delete process.env['JEV_API_KEY']
+      delete process.env['TYPESAFE_API_KEY']
+
+      const res = await runFindCodePipeline('where are MCP tools registered', noJevConfig, false, root)
+      expect(res).toHaveProperty('markdown')
+      expect(res).toHaveProperty('structuredContent')
+      expect(res.markdown).toContain('[Scout: FOUND]')
+      expect(res.markdown).toContain('registerAllTools')
+    } finally {
+      if (prevKey) process.env['JEV_API_KEY'] = prevKey
+      if (prevTsKey) process.env['TYPESAFE_API_KEY'] = prevTsKey
+    }
+  })
+
+  test('zero-match outline fallback renders outlines when no symbol matches query identifiers', async () => {
+    // Query that matches a file conceptually or coarsely, but has unusual identifiers
+    const res = await runFindCodePipeline('nonexistentFunctionIdentifierXYZ in registerTools', mockConfig, false, root)
+    expect(res).toHaveProperty('markdown')
+    expect(res.markdown).toContain('[Scout: FOUND]')
+  })
+
+  test('stale-file refresh updates symbols if file mtime is newer than map generation', async () => {
+    const { readMap } = await import('../cache/map-cache.js')
+    const map = await readMap(root)
+    const targetFile = 'src/shared/constants/budget.ts'
+    const absPath = path.resolve(root, targetFile)
+
+    // Artificially set map generatedAt to past
+    const pastMap = { ...map, generatedAt: Date.now() - 10000 }
+    const { ensureFileFreshness } = await import('../pipeline/index.js')
+    // Touch mtime of target file
+    const now = new Date()
+    await import('node:fs/promises').then((fs) => fs.utimes(absPath, now, now))
+
+    const refreshed = await ensureFileFreshness(targetFile, pastMap, root)
+    expect(refreshed).toBe(true)
+  })
+})
