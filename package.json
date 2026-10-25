@@ -33,7 +33,7 @@
     "AGENTS.template.md"
   ],
   "scripts": {
-    "build": "bun build src/index.ts --outfile dist/index.js --target node --format esm --packages=external && bun build src/bin/test-scout.ts --outdir dist/bin --target node --format esm --packages=external",
+    "build": "bun build src/index.ts --outfile dist/index.js --target node --format esm --packages=external && bun build src/bin/test-scout.ts src/bin/context.ts --outdir dist/bin --target node --format esm --packages=external",
     "check": "tsc --noEmit",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
