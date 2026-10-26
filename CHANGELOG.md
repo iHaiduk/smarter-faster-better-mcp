@@ -6,7 +6,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ---
 
-## [0.11.0] - Unreleased
+## [0.11.0] - 2026-10-26
 
 ### Breaking Changes
 - **Removed `scout_*` Tool Aliases**:
@@ -19,6 +19,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   - `get_file_context` now defaults to compact symbol outlines for files exceeding 150 lines unless `startLine`/`endLine`, `query`, or `full: true` is explicitly provided.
 
 ### Added & Improved
+- **Claude Read-Gate CLI (`context`)**:
+  - Added `dist/bin/context.js` for intercepting whole-file reads in agent harnesses. Emits compact symbol outlines with line spans, folding bodies to prevent context explosion. Exits with code `3` for pass-through on small files.
+- **Plain-Text Markdown Formatting**:
+  - Returned content is formatted as human- and model-readable markdown without escaping, accompanied by MCP `structuredContent` metadata.
 - **Package-Root `.env` Fallback**:
   - `loadConfig()` now loads cwd `.env` first, then falls back to the package-root `.env` so MCP credentials work seamlessly when spawned from consumer repos.
 - **One-Call Scout Pipeline**:
