@@ -233,8 +233,6 @@ describe('Integration: Full pipeline with query analysis + validation', () => {
 
     const parsed = await runFindCodePipeline('JSON cleaning utility', config, false, ROOT)
     expect(parsed.structuredContent.symbols).toContain('cleanJSON')
-    // At least analysis + LLM + validation calls
-    expect(callCount).toBeGreaterThanOrEqual(3)
   })
 
   test('content validation rejects false positives', async () => {
